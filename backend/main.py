@@ -53,6 +53,9 @@ def edytuj_ksiazke(ksiazka_id: int, ksiazka: schemas.KsiazkaCreate, db: Session 
     db_ksiazka.tytul = ksiazka.tytul
     db_ksiazka.autor = ksiazka.autor
     db_ksiazka.opis = ksiazka.opis
+    db_ksiazka.seria = ksiazka.seria
+    db_ksiazka.wydawnictwo = ksiazka.wydawnictwo
+    db_ksiazka.okladka = ksiazka.okladka
     db_ksiazka.cena_jednostkowa = ksiazka.cena_jednostkowa
     db_ksiazka.ilosc_sztuk = ksiazka.ilosc_sztuk
     db_ksiazka.kategoria_id = ksiazka.kategoria_id
