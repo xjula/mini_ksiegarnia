@@ -3,10 +3,30 @@ from sqlalchemy.orm import Session
 import models, schemas
 from database import engine, get_db
 from typing import List
+from fastapi.middleware.cors import CORSMiddleware
+from models import Ksiazka, Kategoria
+from pydantic import BaseModel
+from fastapi import HTTPException
 
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Mini Księgarnia API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # Pozwala Reactowi na rozmowę z Pythonem
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+class Item(BaseModel):
+    id_ksiazki: int
+    ilosc: int
+
+class Order(BaseModel):
+    produkty: List[Item]
+
 
 # --- KATEGORIE ---
 @app.post("/kategorie/", response_model=schemas.KategoriaResponse, tags=["Kategorie"])
@@ -35,10 +55,17 @@ def dodaj_ksiazke(ksiazka: schemas.KsiazkaCreate, db: Session = Depends(get_db))
     db.refresh(nowa_ksiazka)
     return nowa_ksiazka
 
-@app.get("/ksiazki/", response_model=list[schemas.KsiazkaResponse], tags=["Książki"])
-def pobierz_ksiazki(db: Session = Depends(get_db)):
-    # Pobieramy wszystkie książki
-    return db.query(models.Ksiazka).all()
+@app.get("/ksiazki/", tags=["Książki"])
+async def get_books(db: Session = Depends(get_db)):
+    results = db.query(Ksiazka, Kategoria.nazwa).join(Kategoria).all()
+    
+    books_with_category = []
+    for book, cat_name in results:
+        book_data = {column.name: getattr(book, column.name) for column in book.__table__.columns}
+        book_data["kategoria_nazwa"] = cat_name
+        books_with_category.append(book_data)
+        
+    return books_with_category
 
 
 @app.put("/ksiazki/{ksiazka_id}", response_model=schemas.KsiazkaResponse, tags=["Książki"])
@@ -103,36 +130,6 @@ def stworz_uzytkownika(uzytkownik: schemas.UzytkownikCreate, db: Session = Depen
 def pobierz_uzytkownikow(db: Session = Depends(get_db)):
     return db.query(models.Uzytkownik).all()
 
-# --- ZAMÓWIENIA ---
-
-@app.post("/zamowienia/", response_model=schemas.ZamowienieResponse, tags=["Zamówienia"])
-def stworz_zamowienie(zamowienie: schemas.ZamowienieCreate, db: Session = Depends(get_db)):
-    # 1. Stworzenie nagłówka zamówienia
-    nowe_zamowienie = models.Zamowienie(
-        uzytkownik_id=zamowienie.uzytkownik_id,
-        adres_id=zamowienie.adres_id,
-        status="PENDING",
-        cena_calkowita=0 # Wyliczymy na zajęciach VIII
-    )
-    db.add(nowe_zamowienie)
-    db.commit()
-    db.refresh(nowe_zamowienie)
-    
-    # 2. Dodanie pozycji (ksiazka_zamowienia)
-    for pozycja in zamowienie.pozycje:
-        ksiazka = db.query(models.Ksiazka).filter(models.Ksiazka.id == pozycja.ksiazka_id).first()
-        if ksiazka:
-            nowa_pozycja = models.KsiazkaZamowienie(
-                zamowienia_id=nowe_zamowienie.id,
-                ksiazka_id=pozycja.ksiazka_id,
-                ilosc=pozycja.ilosc,
-                cena=ksiazka.cena_jednostkowa
-            )
-            db.add(nowa_pozycja)
-    
-    db.commit()
-    db.refresh(nowe_zamowienie)
-    return nowe_zamowienie
 
 @app.get("/zamowienia/", response_model=List[schemas.ZamowienieResponse], tags=["Zamówienia"])
 def pobierz_zamowienia(db: Session = Depends(get_db)):
@@ -172,3 +169,19 @@ def pobierz_zamowienie(zamowienie_id: int, db: Session = Depends(get_db)):
     if not zamowienie:
         raise HTTPException(status_code=404, detail="Zamówienie nie istnieje")
     return zamowienie
+
+@app.post("/zamowienia/")
+async def create_order(zamowienie: Order, db: Session = Depends(get_db)):
+    print(f"Otrzymano zamówienie: {zamowienie}")
+    
+    for item in zamowienie.produkty:
+        # Szukamy książki w bazie
+        db_book = db.query(Ksiazka).filter(Ksiazka.id == item.id_ksiazki).first()
+        
+        if db_book:
+            # LOGIKA BIZNESOWA: Zmniejszamy stan
+            db_book.ilosc_sztuk -= item.ilosc
+            print(f"Zaktualizowano: {db_book.tytul}, pozostało: {db_book.ilosc_sztuk}")
+    
+    db.commit() # Zapisujemy zmiany w PostgreSQL
+    return {"status": "success", "message": "Stany zaktualizowane"}
