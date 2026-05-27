@@ -14,6 +14,11 @@ import json
 import os
 from dotenv import load_dotenv
 
+import httpx
+from fastapi.responses import RedirectResponse
+from jose import jwt
+from datetime import datetime, timedelta, timezone
+
 load_dotenv()
 models.Base.metadata.create_all(bind=engine)
 
@@ -285,3 +290,91 @@ def zaplac_za_zamowienie(zamowienie_id: int, karta: KartaKredytowa, db: Session 
         raise HTTPException(status_code=400, detail=f"Błąd karty: {str(e)}")
     except stripe.error.StripeError as e:
         raise HTTPException(status_code=400, detail=f"Błąd Stripe: {str(e)}")
+    
+
+
+
+
+#Logowanie
+
+# 1. KONFIGURACJA GITHUB
+GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID")
+GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET")
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+ALGORITHM = "HS256"
+
+if not GITHUB_CLIENT_ID or not GITHUB_CLIENT_SECRET or not JWT_SECRET_KEY:
+    print("UWAGA: Brak skonfigurowanych kluczy w pliku .env")
+
+# 2. Endpoint inicjujący - przekierowuje użytkownika do okna logowania GitHub
+@app.get("/auth/login", tags=["Autoryzacja"])
+async def github_login():
+    github_url = f"https://github.com/login/oauth/authorize?client_id={GITHUB_CLIENT_ID}&scope=user:email"
+    return RedirectResponse(url=github_url)
+
+# 3. Callback - tu wraca użytkownik z GitHuba z tymczasowym kodem
+@app.get("/auth/callback", tags=["Autoryzacja"])
+async def github_callback(code: str):
+    # A. Wymieniamy kod na Access Token od GitHuba
+    async with httpx.AsyncClient() as client:
+        token_response = await client.post(
+            "https://github.com/login/oauth/access_token",
+            data={
+                "client_id": GITHUB_CLIENT_ID,
+                "client_secret": GITHUB_CLIENT_SECRET,
+                "code": code
+            },
+            headers={"Accept": "application/json"}
+        )
+        
+    token_data = token_response.json()
+    if "access_token" not in token_data:
+        raise HTTPException(status_code=400, detail="Błąd autoryzacji w GitHub")
+        
+    access_token = token_data["access_token"]
+    
+    # B. Pobieramy dane profilu użytkownika
+    async with httpx.AsyncClient() as client:
+        user_response = await client.get(
+            "https://api.github.com/user",
+            headers={"Authorization": f"token {access_token}"}
+        )
+    user_info = user_response.json()
+    github_login_name = user_info.get("login")
+    
+    # === TUTAJ BRAKOWAŁO TEJ LINII - DOPISZ JĄ: ===
+    is_admin = github_login_name == "megu02" 
+    
+    # --- NOWY KOD: Odpytanie o ukryte i prywatne adresy e-mail ---
+    user_email = user_info.get("email")
+    if not user_email:
+        try:
+            async with httpx.AsyncClient() as client:
+                emails_response = await client.get(
+                    "https://api.github.com/user/emails",
+                    headers={"Authorization": f"token {access_token}"}
+                )
+            emails_list = emails_response.json()
+            primary_email = next((e["email"] for e in emails_list if e.get("primary")), None)
+            if primary_email:
+                user_email = primary_email
+        except Exception as email_err:
+            print(f"Nie udało się pobrać prywatnych maili: {email_err}")
+
+    if not user_email:
+        user_email = f"{github_login_name}@github.com"
+    
+    # C. Pakujemy dane w nasz bezpieczny token JWT
+    expire = datetime.utcnow() + timedelta(hours=2)
+    token_payload = {
+        "sub": user_info.get("login"),
+        "email": user_email,
+        "avatar": user_info.get("avatar_url"),
+        "isAdmin": is_admin,
+        "exp": expire
+    }
+    
+    jwt_token = jwt.encode(token_payload, JWT_SECRET_KEY, algorithm=ALGORITHM)
+    
+    # D. Odsyłamy użytkownika na specjalną podstronę w React i podajemy token w adresie URL
+    return RedirectResponse(url=f"http://localhost:5173/login-success?token={jwt_token}")

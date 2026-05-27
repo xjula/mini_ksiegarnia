@@ -8,6 +8,7 @@ import { Login } from './pages/Login';
 import { Profile } from './pages/Profile';
 import { Admin } from './pages/Admin';
 import { Trends } from './pages/Trends';
+import { LoginSuccess } from './pages/LoginSuccess'; // <-- KROK 1: Dodany import nowej strony
 
 function NotFound() {
   return (
@@ -34,6 +35,10 @@ export const router = createBrowserRouter([
       { path: 'profile', Component: Profile },
       { path: 'admin', Component: Admin },
       { path: 'trends', Component: Trends },
+      
+      // <-- KROK 2: Dodana ścieżka dla obsługi sukcesu logowania OAuth2
+      { path: 'login-success', Component: LoginSuccess }, 
+      
       { path: '*', Component: NotFound }
     ]
   }

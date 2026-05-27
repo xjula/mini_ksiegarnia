@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { CreditCard, Truck, MapPin, CheckCircle } from 'lucide-react';
+import { CreditCard, Truck, MapPin, CheckCircle, XCircle } from 'lucide-react';
 import { useCart } from '../contexts/CartContext';
 import { useBooks } from '../contexts/BooksContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -10,10 +10,12 @@ export function Checkout() {
   const { getBookById } = useBooks();
   const { user } = useAuth();
   const { fetchBooks } = useBooks();
-  const [step, setStep] = useState<'address' | 'payment' | 'success'>('address');
+  const [step, setStep] = useState<'address' | 'payment' | 'success' | 'error'>('address');
+  const [errorMessage, setErrorMessage] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'online' | 'offline'>('online');
   const [deliveryMethod, setDeliveryMethod] = useState('standard');
   const { items, clearCart, checkout } = useCart();
+  const [isProcessing, setIsProcessing] = useState(false);
   const [address, setAddress] = useState({
     street: '',
     city: '',
@@ -46,23 +48,28 @@ export function Checkout() {
   const tax = subtotal * 0.23;
   const total = subtotal + deliveryCost;
 
-  const handlePlaceOrder = async () => {
+ const handlePlaceOrder = async () => {
+    setIsProcessing(true); // <--- WŁĄCZAMY ŁADOWANIE
+    
     try {
       const odpowiedzZamowienia = await checkout(deliveryCost); 
-      
       const zamowienieId = odpowiedzZamowienia?.zamowienie_id;
 
       if (paymentMethod === 'online' && zamowienieId) {
         const platnoscResponse = await fetch(`http://127.0.0.1:8000/zamowienia/${zamowienieId}/zaplac`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ metoda_platnosci: "pm_card_visa" }) // Testowa karta VISA
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ metoda_platnosci: "pm_card_visa" }) 
         });
 
-        if (!platnoscResponse.ok) {
-          throw new Error("Płatność została odrzucona przez bank.");
+        const danePlatnosci = await platnoscResponse.json();
+
+        if (!platnoscResponse.ok || danePlatnosci.status === 'error' || danePlatnosci.detail) {
+          const komunikatBledu = danePlatnosci.detail || danePlatnosci.wiadomosc || "Płatność została odrzucona przez bank.";
+          
+          setErrorMessage(komunikatBledu);
+          setStep('error'); 
+          return; 
         }
       }
 
@@ -71,38 +78,73 @@ export function Checkout() {
       
     } catch (error) {
       console.error("Błąd podczas składania zamówienia:", error);
-      alert("Wystąpił błąd przy płatności: Sprawdź konsolę lub spróbuj ponownie.");
+      setErrorMessage("Wystąpił nieoczekiwany problem z połączeniem. Spróbuj ponownie później.");
+      setStep('error');
+    } finally {
+      setIsProcessing(false); // <--- WYŁĄCZAMY ŁADOWANIE ZAWSZE NA KOŃCU
     }
   };
 
-  if (items.length === 0 && step !== 'success') {
+  if (items.length === 0 && step === 'address') {
     navigate('/cart');
     return null;
   }
-
+  if (isProcessing) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-32 text-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-6"></div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Przetwarzanie płatności...</h2>
+        <p className="text-gray-600">Proszę nie odświeżać ani nie zamykać strony.</p>
+      </div>
+    );
+  }
   if (step === 'success') {
     return (
       <div className="max-w-2xl mx-auto px-4 py-16">
-        <div className="bg-white rounded-lg shadow-lg p-12 text-center">
+        <div className="bg-white rounded-lg shadow-lg p-12 text-center border-t-4 border-green-500">
           <CheckCircle className="w-24 h-24 text-green-500 mx-auto mb-6" />
           <h1 className="text-3xl font-bold text-gray-900 mb-4">
             Zamówienie złożone pomyślnie!
           </h1>
-          <p className="text-gray-600 mb-8">
-            Dziękujemy za zakupy. Potwierdzenie zostało wysłane na adres {user.email}
+          <p className="text-gray-600 mb-8 text-lg">
+            Dziękujemy za zakupy. Twoja płatność została pomyślnie zweryfikowana, a książki zostały zarezerwowane w magazynie.
           </p>
-          <div className="bg-green-50 border border-green-200 rounded-lg p-6 mb-8">
-            <p className="text-green-800 font-medium">
-              Status płatności:{' '}
-              {paymentMethod === 'online' ? 'Opłacone' : 'Oczekuje na potwierdzenie'}
-            </p>
-            <p className="text-green-700 text-sm mt-2">
-              Kwota: {total.toFixed(2)} zł
-            </p>
+          <button
+            onClick={() => navigate('/')}
+            className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-all shadow-md"
+          >
+            Wróć do strony głównej
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (step === 'error') {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-16">
+        <div className="bg-white rounded-lg shadow-lg p-12 text-center border-t-4 border-red-500">
+          <XCircle className="w-24 h-24 text-red-500 mx-auto mb-6" />
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">
+            Płatność nie powiodła się
+          </h1>
+          <p className="text-gray-600 mb-8 text-lg">
+            {errorMessage}
+          </p>
+          <div className="flex justify-center gap-4">
+            <button
+              onClick={() => setStep('payment')}
+              className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition-all"
+            >
+              Spróbuj zapłacić ponownie
+            </button>
+            <button
+              onClick={() => navigate('/cart')}
+              className="px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium transition-all"
+            >
+              Wróć do koszyka
+            </button>
           </div>
-          <p className="text-sm text-gray-500">
-            Przekierowanie do strony głównej...
-          </p>
         </div>
       </div>
     );

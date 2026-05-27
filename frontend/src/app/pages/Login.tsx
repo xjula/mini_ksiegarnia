@@ -5,7 +5,7 @@ import { User, Lock, Mail } from 'lucide-react';
 
 export function Login() {
   const navigate = useNavigate();
-  const { login, register } = useAuth();
+  const { login, register, loginWithGitHub } = useAuth(); // Wyciągamy naszą nową funkcję z Contextu
   const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -77,7 +77,7 @@ export function Login() {
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
-                  type="email"
+                  type="type"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -119,13 +119,31 @@ export function Login() {
             </button>
           </form>
 
+          {/* --- INTEGRACJA SOCIAL MEDIA (OAuth2) --- */}
+          <div className="mt-5">
+            <div className="relative flex py-2 items-center">
+              <div className="flex-grow border-t border-gray-200"></div>
+              <span className="flex-shrink mx-4 text-gray-400 text-xs uppercase">Lub przez social media</span>
+              <div className="flex-grow border-t border-gray-200"></div>
+            </div>
+
+            <button 
+              type="button"
+              onClick={loginWithGitHub}
+              className="w-full mt-3 bg-gray-900 text-white p-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-800 transition-colors font-bold shadow-md"
+            >
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.464-1.11-1.464-.908-.62.069-.0.069-.608.01 1.003.115 1.53 1.53 1.53a2.473 2.473 0 001.767.75c.069-1.289.587-2.167 1.16-2.665-2.222-.253-4.559-1.11-4.559-4.947 0-1.093.39-1.987 1.029-2.688-.103-.253-.446-1.27.098-2.65 0 0 .84-.27 2.75 1.025A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.203 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.691-4.566 4.94.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.579.688.481C19.137 20.162 22 16.418 22 12c0-5.523-4.477-10-10-10z"/></svg>
+              Zaloguj przez GitHub
+            </button>
+          </div>
+
           <div className="mt-6 text-center">
             <button
               onClick={() => {
                 setIsRegister(!isRegister);
                 setError('');
               }}
-              className="text-blue-600 hover:text-blue-700"
+              className="text-blue-600 hover:text-blue-700 text-sm"
             >
               {isRegister
                 ? 'Masz już konto? Zaloguj się'
