@@ -47,13 +47,31 @@ export function Checkout() {
   const total = subtotal + deliveryCost;
 
   const handlePlaceOrder = async () => {
-  try {
-      await checkout(); 
-      await fetchBooks(); 
+    try {
+      const odpowiedzZamowienia = await checkout(deliveryCost); 
       
+      const zamowienieId = odpowiedzZamowienia?.zamowienie_id;
+
+      if (paymentMethod === 'online' && zamowienieId) {
+        const platnoscResponse = await fetch(`http://127.0.0.1:8000/zamowienia/${zamowienieId}/zaplac`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ metoda_platnosci: "pm_card_visa" }) // Testowa karta VISA
+        });
+
+        if (!platnoscResponse.ok) {
+          throw new Error("Płatność została odrzucona przez bank.");
+        }
+      }
+
+      await fetchBooks(); 
       setStep('success');
+      
     } catch (error) {
-      console.error("Błąd odświeżania danych");
+      console.error("Błąd podczas składania zamówienia:", error);
+      alert("Wystąpił błąd przy płatności: Sprawdź konsolę lub spróbuj ponownie.");
     }
   };
 

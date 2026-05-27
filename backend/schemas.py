@@ -83,8 +83,8 @@ class ZamowienieResponse(BaseModel):
     status: str
     cena_calkowita: float
     data_zamowienia: datetime
-    uzytkownik_id: int
-    adres_id: int
+    uzytkownik_id: Optional[int] = None
+    adres_id: Optional[int] = None
     metoda_dostawy: Optional[str] = None
     koszt_dostawy: Optional[float] = None
     ksiazki_link: List[PozycjaZamowieniaResponse] 

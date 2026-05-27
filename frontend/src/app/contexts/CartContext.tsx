@@ -19,7 +19,7 @@ interface CartContextType {
   removeItem: (bookId: number) => void;
   updateQuantity: (bookId: number, quantity: number) => void;
   clearCart: () => void;
-  checkout: () => Promise<void>;
+  checkout: (deliveryCost: number) => Promise<any>;
   totalItems: number;
 }
 
@@ -87,8 +87,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'UPDATE_QUANTITY', bookId, quantity, maxStock: book?.stock || 0 });
   };
 
-  const checkout = async () => {
-    if (state.items.length === 0) return alert("Koszyk jest pusty!");
+ const checkout = async (deliveryCost: number) => { 
+    if (state.items.length === 0) {
+      alert("Koszyk jest pusty!");
+      return;
+    }
     
     try {
       const orderPayload = {
@@ -96,13 +99,19 @@ export function CartProvider({ children }: { children: ReactNode }) {
           id_ksiazki: item.bookId,
           ilosc: item.quantity
         })),
+        koszt_dostawy: deliveryCost, 
         data_zamowienia: new Date().toISOString()
       };
-      await apiClient.post('/zamowienia/', orderPayload);
+      
+      const response = await apiClient.post('/zamowienia/', orderPayload);
       dispatch({ type: 'CLEAR_CART' });
+      
+      return response.data || response; 
+
     } catch (error) {
       console.error("Błąd podczas składania zamówienia:", error);
       alert("Wystąpił problem z połączeniem. Sprawdź czy FastAPI działa.");
+      throw error;
     }
   };
 

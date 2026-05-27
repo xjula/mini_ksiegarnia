@@ -1,4 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException
+import stripe
+from stripe import CardError
 from sqlalchemy.orm import Session
 import models, schemas
 from database import engine, get_db
@@ -7,14 +9,21 @@ from fastapi.middleware.cors import CORSMiddleware
 from models import Ksiazka, Kategoria
 from pydantic import BaseModel
 from fastapi import HTTPException
+import pika
+import json
+import os
+from dotenv import load_dotenv
 
+load_dotenv()
 models.Base.metadata.create_all(bind=engine)
+
+stripe.api_key = os.getenv("STRIPE_API_KEY")
 
 app = FastAPI(title="Mini Księgarnia API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Pozwala Reactowi na rozmowę z Pythonem
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -26,6 +35,7 @@ class Item(BaseModel):
 
 class Order(BaseModel):
     produkty: List[Item]
+    koszt_dostawy: float = 0.0  
 
 
 # --- KATEGORIE ---
@@ -117,7 +127,7 @@ def stworz_uzytkownika(uzytkownik: schemas.UzytkownikCreate, db: Session = Depen
     nowy_uzytkownik = models.Uzytkownik(
         email=uzytkownik.email, 
         full_name=uzytkownik.full_name,
-        haslo=uzytkownik.haslo, # To jest wymagane przez models.py
+        haslo=uzytkownik.haslo, 
         rola=uzytkownik.rola,
         oauth=uzytkownik.oauth
     )
@@ -170,18 +180,108 @@ def pobierz_zamowienie(zamowienie_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Zamówienie nie istnieje")
     return zamowienie
 
-@app.post("/zamowienia/")
-async def create_order(zamowienie: Order, db: Session = Depends(get_db)):
+@app.post("/zamowienia/", tags=["Zamówienia"])
+async def stworz_zamowienie(zamowienie: Order, db: Session = Depends(get_db)):
     print(f"Otrzymano zamówienie: {zamowienie}")
     
+    laczna_cena = 0.0 
     for item in zamowienie.produkty:
-        # Szukamy książki w bazie
         db_book = db.query(Ksiazka).filter(Ksiazka.id == item.id_ksiazki).first()
-        
         if db_book:
-            # LOGIKA BIZNESOWA: Zmniejszamy stan
+            laczna_cena += (db_book.cena_jednostkowa * item.ilosc)
             db_book.ilosc_sztuk -= item.ilosc
             print(f"Zaktualizowano: {db_book.tytul}, pozostało: {db_book.ilosc_sztuk}")
     
-    db.commit() # Zapisujemy zmiany w PostgreSQL
-    return {"status": "success", "message": "Stany zaktualizowane"}
+    # --- NOWOŚĆ: Dodajemy koszt dostawy przesłany z frontendu ---
+    laczna_cena += zamowienie.koszt_dostawy
+    
+    # Zapisujemy w bazie pełną kwotę zamówienia wraz z dostawą
+    nowe_zamowienie = models.Zamowienie(
+        status="PENDING", 
+        cena_calkowita=laczna_cena,
+        koszt_dostawy=zamowienie.koszt_dostawy
+    ) 
+    
+    db.add(nowe_zamowienie)
+    db.commit() 
+    db.refresh(nowe_zamowienie) 
+    
+    return {
+        "status": "success", 
+        "message": "Stany zaktualizowane",
+        "zamowienie_id": nowe_zamowienie.id 
+    }
+# --- PŁATNOŚCI STRIPE ---
+
+# Klasa pomocnicza dla Swaggera
+class KartaKredytowa(BaseModel):
+    metoda_platnosci: str = "pm_card_visa" 
+
+@app.post("/zamowienia/{zamowienie_id}/zaplac", tags=["Płatności"])
+def zaplac_za_zamowienie(zamowienie_id: int, karta: KartaKredytowa, db: Session = Depends(get_db)):
+    # 1. Szukamy zamówienia w bazie
+    zamowienie = db.query(models.Zamowienie).filter(models.Zamowienie.id == zamowienie_id).first()
+    
+    if not zamowienie:
+        raise HTTPException(status_code=404, detail="Zamówienie nie istnieje")
+        
+    if zamowienie.status == "OPŁACONE":
+        raise HTTPException(status_code=400, detail="To zamówienie zostało już opłacone.")
+
+    # 2. Pobieramy prawdziwą cenę z zamówienia w bazie i zamieniamy na grosze dla Stripe
+    kwota_w_groszach = int(round(zamowienie.cena_calkowita * 100))
+
+    # 3. Próba obciążenia karty 
+    try:
+        intent = stripe.PaymentIntent.create(
+            amount=kwota_w_groszach,
+            currency="pln",
+            payment_method=karta.metoda_platnosci,
+            payment_method_types=["card"],
+            confirm=True 
+        )
+        
+       # --- SCENARIUSZ POZYTYWNY ---
+        zamowienie.status = "OPŁACONE"
+        
+        # Zapisujemy dowód płatności w bazie
+        nowa_platnosc = models.Platnosc(
+            zamowienia_id=zamowienie.id,
+            status="SUCCESS",
+            metoda_platnosci="Stripe",
+            platnosc_id=intent.id
+        )
+        db.add(nowa_platnosc)
+        db.commit()
+
+        # --- NOWY KOD: WYSYŁKA DO RABBITMQ ---
+        try:
+            url = os.getenv("RABBITMQ_URL")
+            params = pika.URLParameters(url)
+            connection = pika.BlockingConnection(params)
+            channel = connection.channel()
+
+            channel.queue_declare(queue='platnosci')
+
+            wiadomosc = {
+                "zamowienie_id": zamowienie_id,
+                "status": "OPŁACONE",
+                "kwota": kwota_w_groszach / 100 
+            }
+
+            channel.basic_publish(
+                exchange='',
+                routing_key='platnosci',
+                body=json.dumps(wiadomosc)
+            )
+            print(f"Sukces: Wysłano do RabbitMQ dla zamówienia {zamowienie_id}")
+            connection.close()
+        except Exception as rabbit_err:
+            print(f"Błąd RabbitMQ: {rabbit_err}")
+        # -------------------------------------
+        
+        return {"wiadomosc": "Płatność zakończona sukcesem!", "status": zamowienie.status}
+    except stripe.error.CardError as e:
+        raise HTTPException(status_code=400, detail=f"Błąd karty: {str(e)}")
+    except stripe.error.StripeError as e:
+        raise HTTPException(status_code=400, detail=f"Błąd Stripe: {str(e)}")
