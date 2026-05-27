@@ -48,9 +48,7 @@ export function Checkout() {
   const tax = subtotal * 0.23;
   const total = subtotal + deliveryCost;
 
- const handlePlaceOrder = async () => {
-    setIsProcessing(true); // <--- WŁĄCZAMY ŁADOWANIE
-    
+  const handlePlaceOrder = async () => {
     try {
       const odpowiedzZamowienia = await checkout(deliveryCost); 
       const zamowienieId = odpowiedzZamowienia?.zamowienie_id;
@@ -58,18 +56,14 @@ export function Checkout() {
       if (paymentMethod === 'online' && zamowienieId) {
         const platnoscResponse = await fetch(`http://127.0.0.1:8000/zamowienia/${zamowienieId}/zaplac`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ metoda_platnosci: "pm_card_visa" }) 
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ metoda_platnosci: "pm_card_visa" }) // Testowa karta VISA
         });
 
-        const danePlatnosci = await platnoscResponse.json();
-
-        if (!platnoscResponse.ok || danePlatnosci.status === 'error' || danePlatnosci.detail) {
-          const komunikatBledu = danePlatnosci.detail || danePlatnosci.wiadomosc || "Płatność została odrzucona przez bank.";
-          
-          setErrorMessage(komunikatBledu);
-          setStep('error'); 
-          return; 
+        if (!platnoscResponse.ok) {
+          throw new Error("Płatność została odrzucona przez bank.");
         }
       }
 
@@ -78,10 +72,7 @@ export function Checkout() {
       
     } catch (error) {
       console.error("Błąd podczas składania zamówienia:", error);
-      setErrorMessage("Wystąpił nieoczekiwany problem z połączeniem. Spróbuj ponownie później.");
-      setStep('error');
-    } finally {
-      setIsProcessing(false); // <--- WYŁĄCZAMY ŁADOWANIE ZAWSZE NA KOŃCU
+      alert("Wystąpił błąd przy płatności: Sprawdź konsolę lub spróbuj ponownie.");
     }
   };
 
@@ -89,15 +80,7 @@ export function Checkout() {
     navigate('/cart');
     return null;
   }
-  if (isProcessing) {
-    return (
-      <div className="max-w-2xl mx-auto px-4 py-32 text-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-6"></div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Przetwarzanie płatności...</h2>
-        <p className="text-gray-600">Proszę nie odświeżać ani nie zamykać strony.</p>
-      </div>
-    );
-  }
+
   if (step === 'success') {
     return (
       <div className="max-w-2xl mx-auto px-4 py-16">
