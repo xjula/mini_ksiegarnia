@@ -6,7 +6,7 @@ interface BooksContextType {
   books: Book[];
   reviews: Review[];
   loading: boolean;
-  fetchBooks: () => Promise<void>; // Dodane do interfejsu
+  fetchBooks: () => Promise<void>; 
   getBookById: (id: number) => Book | undefined;
   getReviewsByBookId: (bookId: number) => Review[];
   addBook: (book: Omit<Book, 'id'>) => void;
@@ -22,25 +22,31 @@ export function BooksProvider({ children }: { children: ReactNode }) {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchBooks = async () => {
+    const fetchBooks = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get('/ksiazki/'); 
+      const response = await apiClient.get('/ksiazki/');
       
       const mappedBooks = response.data.map((b: any) => ({
         id: b.id,
         title: b.tytul,
         author: b.autor,
         description: b.opis || "Brak opisu",
+        series: b.seria || "",
+        publisher: b.wydawnictwo || "Nieznane",
+        language: b.jezyk_wydania || "Polski",
+        edition: b.numer_wydania || 1,
+        publishDate: b.data_premiery,
+        zdjecie_url: b.okladka, 
         price: b.cena_jednostkowa,
-        category: b.kategoria_nazwa || "Inne",
-        rating: b.ocena || 5.0,
-        reviewCount: b.liczba_recenzji || 0,
-        trend: 'stable',
         stock: b.ilosc_sztuk,
-        isbn: b.isbn || "",
-        publishYear: b.rok_wydania || 2024,
-        publisher: b.wydawnictwo || ""
+        categoryId: b.kategoria_id,
+        category: b.kategoria_nazwa,
+        publishYear: b.data_premiery ? new Date(b.data_premiery).getFullYear() : 2024,
+        isbn: "Brak ISBN", 
+        rating: 5.0,       
+        reviewCount: 0,  
+        trend: 'stable'    
       }));
 
       setBooks(mappedBooks);
@@ -50,8 +56,6 @@ export function BooksProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     }
   };
-
-  // 2. Pobierz dane przy starcie
   useEffect(() => {
     fetchBooks();
   }, []);

@@ -5,6 +5,7 @@ export interface Book {
   description: string;
   price: number;
   category: string;
+  zdjecie_url?: string;
   rating: number;
   reviewCount: number;
   trend: 'up' | 'stable' | 'down';

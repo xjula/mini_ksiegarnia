@@ -5,7 +5,7 @@ import { User, Lock, Mail } from 'lucide-react';
 
 export function Login() {
   const navigate = useNavigate();
-  const { login, register, loginWithGitHub } = useAuth(); // Wyciągamy naszą nową funkcję z Contextu
+  const { login, register, loginWithGitHub } = useAuth(); 
   const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

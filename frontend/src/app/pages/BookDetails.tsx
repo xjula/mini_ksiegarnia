@@ -83,9 +83,17 @@ export function BookDetails() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
         <div className="lg:col-span-1">
-          <div className="bg-gradient-to-br from-blue-100 to-purple-100 rounded-lg p-8 aspect-square flex items-center justify-center">
-            <span className="text-9xl text-blue-600 opacity-30">📚</span>
-          </div>
+          {book.zdjecie_url ? (
+            <img 
+              src={book.zdjecie_url} 
+              alt={book.title} 
+              className="w-full max-w-sm mx-auto h-auto object-contain rounded-lg shadow-xl"
+            />
+          ) : (
+            <div className="bg-gradient-to-br from-blue-100 to-purple-100 rounded-lg p-8 aspect-square flex items-center justify-center shadow-lg">
+              <span className="text-9xl text-blue-600 opacity-30">📚</span>
+            </div>
+          )}
         </div>
 
         <div className="lg:col-span-2">

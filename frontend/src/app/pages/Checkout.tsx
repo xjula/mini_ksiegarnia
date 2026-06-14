@@ -49,6 +49,7 @@ export function Checkout() {
   const total = subtotal + deliveryCost;
 
   const handlePlaceOrder = async () => {
+    setIsProcessing(true); 
     try {
       const odpowiedzZamowienia = await checkout(deliveryCost); 
       const zamowienieId = odpowiedzZamowienia?.zamowienie_id;
@@ -59,7 +60,7 @@ export function Checkout() {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ metoda_platnosci: "pm_card_visa" }) // Testowa karta VISA
+          body: JSON.stringify({ metoda_platnosci: "pm_card_visa" }) 
         });
 
         if (!platnoscResponse.ok) {
@@ -72,9 +73,13 @@ export function Checkout() {
       
     } catch (error) {
       console.error("Błąd podczas składania zamówienia:", error);
-      alert("Wystąpił błąd przy płatności: Sprawdź konsolę lub spróbuj ponownie.");
+      setErrorMessage("Wystąpił błąd przy płatności. Spróbuj ponownie.");
+      setStep('error');
+    } finally {
+      setIsProcessing(false); 
     }
-  };
+   };
+    
 
   if (items.length === 0 && step === 'address') {
     navigate('/cart');
@@ -99,6 +104,15 @@ export function Checkout() {
             Wróć do strony głównej
           </button>
         </div>
+      </div>
+    );
+  }
+  if (isProcessing) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-32 text-center">
+        <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Przetwarzanie zamówienia...</h2>
+        <p className="text-gray-600">Proszę nie zamykać tej strony. Łączymy się z systemem płatności.</p>
       </div>
     );
   }

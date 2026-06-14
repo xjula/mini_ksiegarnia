@@ -31,6 +31,19 @@ export function Cart() {
     }
     navigate('/checkout');
   };
+  
+  const odmienPrzedmiot = (ilosc: number) => {
+    if (ilosc === 1) return 'przedmiot';
+    
+    const reszta10 = ilosc % 10;
+    const reszta100 = ilosc % 100;
+    
+    if (reszta10 >= 2 && reszta10 <= 4 && (reszta100 < 10 || reszta100 >= 20)) {
+      return 'przedmioty';
+    }
+    
+    return 'przedmiotów';
+  };
 
   if (items.length === 0) {
     return (
@@ -53,7 +66,7 @@ export function Cart() {
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold text-gray-900 mb-8">
-        Koszyk ({totalItems} {totalItems === 1 ? 'przedmiot' : 'przedmiotów'})
+        Koszyk ({totalItems} {odmienPrzedmiot(totalItems)})
       </h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -61,8 +74,18 @@ export function Cart() {
           {cartItems.map((item) => (
             <div key={item.bookId} className="bg-white rounded-lg shadow-md p-6">
               <div className="flex gap-6">
-                <div className="w-24 h-32 bg-gradient-to-br from-blue-100 to-purple-100 rounded flex items-center justify-center flex-shrink-0">
-                  <span className="text-4xl text-blue-600 opacity-30">📚</span>
+               <div className="flex-shrink-0">
+                  {item.book.zdjecie_url ? (
+                    <img
+                      src={item.book.zdjecie_url}
+                      alt={item.book.title}
+                      className="w-24 h-32 object-cover rounded shadow-sm"
+                    />
+                  ) : (
+                    <div className="w-24 h-32 bg-gradient-to-br from-blue-100 to-purple-100 rounded flex items-center justify-center">
+                      <span className="text-4xl text-blue-600 opacity-30">📚</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex-1">

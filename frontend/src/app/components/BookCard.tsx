@@ -28,9 +28,17 @@ export function BookCard({ book }: BookCardProps) {
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-shadow">
       <Link to={`/book/${book.id}`}>
-        <div className="h-48 bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center">
-          <span className="text-6xl text-blue-600 opacity-20">📚</span>
-        </div>
+        {book.zdjecie_url ? (
+          <img 
+            src={book.zdjecie_url} 
+            alt={book.title} 
+            className="w-full h-48 object-cover"
+          />
+        ) : (
+          <div className="h-48 bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center">
+            <span className="text-6xl text-blue-600 opacity-20">📚</span>
+          </div>
+        )}
       </Link>
       <div className="p-6">
         <div className="flex items-start justify-between mb-2">
