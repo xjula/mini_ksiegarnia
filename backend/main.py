@@ -78,6 +78,8 @@ async def get_books(db: Session = Depends(get_db)):
     for book, cat_name in results:
         book_data = {column.name: getattr(book, column.name) for column in book.__table__.columns}
         book_data["kategoria_nazwa"] = cat_name
+        book_data["trend"] = book.trend
+        
         books_with_category.append(book_data)
         
     return books_with_category
@@ -190,17 +192,19 @@ async def stworz_zamowienie(zamowienie: Order, db: Session = Depends(get_db)):
     print(f"Otrzymano zamówienie: {zamowienie}")
     
     laczna_cena = 0.0 
+    # Przygotowujemy pustą listę, żeby zapamiętać ID książek do przeliczenia trendu
+    kupione_ksiazki_ids = []
+
     for item in zamowienie.produkty:
         db_book = db.query(Ksiazka).filter(Ksiazka.id == item.id_ksiazki).first()
         if db_book:
             laczna_cena += (db_book.cena_jednostkowa * item.ilosc)
             db_book.ilosc_sztuk -= item.ilosc
+            kupione_ksiazki_ids.append(item.id_ksiazki) # Zapisujemy ID do kolejki
             print(f"Zaktualizowano: {db_book.tytul}, pozostało: {db_book.ilosc_sztuk}")
     
-    # --- NOWOŚĆ: Dodajemy koszt dostawy przesłany z frontendu ---
     laczna_cena += zamowienie.koszt_dostawy
     
-    # Zapisujemy w bazie pełną kwotę zamówienia wraz z dostawą
     nowe_zamowienie = models.Zamowienie(
         status="PENDING", 
         cena_calkowita=laczna_cena,
@@ -210,6 +214,32 @@ async def stworz_zamowienie(zamowienie: Order, db: Session = Depends(get_db)):
     db.add(nowe_zamowienie)
     db.commit() 
     db.refresh(nowe_zamowienie) 
+
+    # --- WYSYŁKA ZADAŃ DO RABBITMQ ---
+    try:
+        # Używamy tego samego mechanizmu co w płatnościach Stripe
+        url = os.getenv("RABBITMQ_URL")
+        params = pika.URLParameters(url)
+        connection = pika.BlockingConnection(params)
+        channel = connection.channel()
+
+        # Tworzymy nową kolejkę specjalnie dla trendów
+        channel.queue_declare(queue='trendy_kolejka')
+
+        # Wysyłamy osobną wiadomość dla każdej zakupionej książki
+        for book_id in kupione_ksiazki_ids:
+            wiadomosc = {"book_id": book_id, "akcja": "przelicz_trend"}
+            channel.basic_publish(
+                exchange='',
+                routing_key='trendy_kolejka',
+                body=json.dumps(wiadomosc)
+            )
+            print(f"Wysłano zadanie przeliczenia trendu dla książki {book_id}")
+
+        connection.close()
+    except Exception as rabbit_err:
+        print(f"Błąd RabbitMQ (trendy): {rabbit_err}")
+    # ---------------------------------
     
     return {
         "status": "success", 
@@ -259,7 +289,6 @@ def zaplac_za_zamowienie(zamowienie_id: int, karta: KartaKredytowa, db: Session 
         db.add(nowa_platnosc)
         db.commit()
 
-        # --- NOWY KOD: WYSYŁKA DO RABBITMQ ---
         try:
             url = os.getenv("RABBITMQ_URL")
             params = pika.URLParameters(url)
@@ -291,9 +320,6 @@ def zaplac_za_zamowienie(zamowienie_id: int, karta: KartaKredytowa, db: Session 
     except stripe.error.StripeError as e:
         raise HTTPException(status_code=400, detail=f"Błąd Stripe: {str(e)}")
     
-
-
-
 
 #Logowanie
 
@@ -342,10 +368,8 @@ async def github_callback(code: str):
     user_info = user_response.json()
     github_login_name = user_info.get("login")
     
-    # === TUTAJ BRAKOWAŁO TEJ LINII - DOPISZ JĄ: ===
     is_admin = github_login_name == "megu02" 
     
-    # --- NOWY KOD: Odpytanie o ukryte i prywatne adresy e-mail ---
     user_email = user_info.get("email")
     if not user_email:
         try:

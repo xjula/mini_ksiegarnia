@@ -30,6 +30,7 @@ class Ksiazka(Base):
     kategoria = relationship("Kategoria", back_populates="ksiazki")
     zamowienia_link = relationship("KsiazkaZamowienie", back_populates="ksiazka")
     recenzje = relationship("Recenzja", back_populates="ksiazka")
+    trend = Column(String, default="stable") 
     trendy = relationship("Trend", back_populates="ksiazka")
 
 class Uzytkownik(Base):

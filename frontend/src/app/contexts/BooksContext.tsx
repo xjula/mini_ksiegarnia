@@ -26,7 +26,7 @@ export function BooksProvider({ children }: { children: ReactNode }) {
     try {
       setLoading(true);
       const response = await apiClient.get('/ksiazki/');
-      
+
       const mappedBooks = response.data.map((b: any) => ({
         id: b.id,
         title: b.tytul,
@@ -42,12 +42,16 @@ export function BooksProvider({ children }: { children: ReactNode }) {
         stock: b.ilosc_sztuk,
         categoryId: b.kategoria_id,
         category: b.kategoria_nazwa,
+        
         publishYear: b.data_premiery ? new Date(b.data_premiery).getFullYear() : 2024,
         isbn: "Brak ISBN", 
-        rating: 5.0,       
-        reviewCount: 0,  
-        trend: 'stable'    
+        rating: b.ocena || 5.0,       
+        reviewCount: b.liczba_recenzji || 0,    
+        
+  
+        trend: b.trend || 'stable'
       }));
+
       mappedBooks.sort((a: any, b: any) => a.title.localeCompare(b.title));
 
       setBooks(mappedBooks);
@@ -57,6 +61,7 @@ export function BooksProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     }
   };
+     
   useEffect(() => {
     fetchBooks();
   }, []);

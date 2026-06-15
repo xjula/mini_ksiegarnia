@@ -68,7 +68,8 @@ export function Checkout() {
         }
       }
 
-      await fetchBooks(); 
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      await fetchBooks();
       setStep('success');
       
     } catch (error) {
