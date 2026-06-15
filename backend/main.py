@@ -186,66 +186,58 @@ def pobierz_zamowienie(zamowienie_id: int, db: Session = Depends(get_db)):
     if not zamowienie:
         raise HTTPException(status_code=404, detail="Zamówienie nie istnieje")
     return zamowienie
-
 @app.post("/zamowienia/", tags=["Zamówienia"])
 async def stworz_zamowienie(zamowienie: Order, db: Session = Depends(get_db)):
-    print(f"Otrzymano zamówienie: {zamowienie}")
-    
     laczna_cena = 0.0 
-    # Przygotowujemy pustą listę, żeby zapamiętać ID książek do przeliczenia trendu
     kupione_ksiazki_ids = []
+
+    nowe_zamowienie = models.Zamowienie(
+        status="PENDING", 
+        cena_calkowita=0.0, 
+        koszt_dostawy=zamowienie.koszt_dostawy
+    ) 
+    db.add(nowe_zamowienie)
+    db.commit() 
+    db.refresh(nowe_zamowienie) 
 
     for item in zamowienie.produkty:
         db_book = db.query(Ksiazka).filter(Ksiazka.id == item.id_ksiazki).first()
         if db_book:
             laczna_cena += (db_book.cena_jednostkowa * item.ilosc)
             db_book.ilosc_sztuk -= item.ilosc
-            kupione_ksiazki_ids.append(item.id_ksiazki) # Zapisujemy ID do kolejki
-            print(f"Zaktualizowano: {db_book.tytul}, pozostało: {db_book.ilosc_sztuk}")
+            kupione_ksiazki_ids.append(item.id_ksiazki)
+            
+
+            nowa_pozycja = models.KsiazkaZamowienie(
+                zamowienia_id=nowe_zamowienie.id,
+                ksiazka_id=db_book.id,
+                ilosc=item.ilosc,
+                cena=db_book.cena_jednostkowa
+            )
+            db.add(nowa_pozycja)
     
-    laczna_cena += zamowienie.koszt_dostawy
-    
-    nowe_zamowienie = models.Zamowienie(
-        status="PENDING", 
-        cena_calkowita=laczna_cena,
-        koszt_dostawy=zamowienie.koszt_dostawy
-    ) 
-    
-    db.add(nowe_zamowienie)
+    nowe_zamowienie.cena_calkowita = laczna_cena + zamowienie.koszt_dostawy
     db.commit() 
-    db.refresh(nowe_zamowienie) 
 
     # --- WYSYŁKA ZADAŃ DO RABBITMQ ---
     try:
-        # Używamy tego samego mechanizmu co w płatnościach Stripe
         url = os.getenv("RABBITMQ_URL")
         params = pika.URLParameters(url)
         connection = pika.BlockingConnection(params)
         channel = connection.channel()
-
-        # Tworzymy nową kolejkę specjalnie dla trendów
         channel.queue_declare(queue='trendy_kolejka')
 
-        # Wysyłamy osobną wiadomość dla każdej zakupionej książki
         for book_id in kupione_ksiazki_ids:
             wiadomosc = {"book_id": book_id, "akcja": "przelicz_trend"}
-            channel.basic_publish(
-                exchange='',
-                routing_key='trendy_kolejka',
-                body=json.dumps(wiadomosc)
-            )
-            print(f"Wysłano zadanie przeliczenia trendu dla książki {book_id}")
-
+            channel.basic_publish(exchange='', routing_key='trendy_kolejka', body=json.dumps(wiadomosc))
+        
         connection.close()
     except Exception as rabbit_err:
-        print(f"Błąd RabbitMQ (trendy): {rabbit_err}")
-    # ---------------------------------
+        print(f"Błąd RabbitMQ: {rabbit_err}")
     
-    return {
-        "status": "success", 
-        "message": "Stany zaktualizowane",
-        "zamowienie_id": nowe_zamowienie.id 
-    }
+    return {"status": "success", "zamowienie_id": nowe_zamowienie.id}
+    
+
 # --- PŁATNOŚCI STRIPE ---
 
 # Klasa pomocnicza dla Swaggera

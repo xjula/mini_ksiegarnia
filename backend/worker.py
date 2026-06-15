@@ -5,43 +5,51 @@ from dotenv import load_dotenv
 from sqlalchemy.orm import sessionmaker
 from database import engine  
 from models import Ksiazka
+from datetime import datetime, timedelta
+from sqlalchemy import func
+import models 
 
 load_dotenv()
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-def wylicz_trend(ilosc_sztuk: int) -> str:
-    """Prosty algorytm wyliczający trend na podstawie stanu magazynu."""
-    if ilosc_sztuk <= 5:
-        return "up"
-    elif ilosc_sztuk >= 20:
-        return "down"
+def wylicz_trend(db, book_id: int) -> str:
+    tydzien_temu = datetime.utcnow() - timedelta(days=7)
+    
+    # Pełne zapytanie - sprawdza powiązania i bierze pod uwagę tylko ostatnie 7 dni
+    sprzedaz_tygodniowa = db.query(func.sum(models.KsiazkaZamowienie.ilosc))\
+        .join(models.Zamowienie)\
+        .filter(models.KsiazkaZamowienie.ksiazka_id == book_id)\
+        .filter(models.Zamowienie.data_zamowienia >= tydzien_temu)\
+        .scalar() or 0
+    
+    print(f"[DEBUG] Książka {book_id}, sprzedaż z 7 dni: {sprzedaz_tygodniowa}")
+    
+    if sprzedaz_tygodniowa >= 10:
+        return "up"     
+    elif sprzedaz_tygodniowa == 0:
+        return "down"   
     return "stable"
 
 def callback(ch, method, properties, body):
-    """Ta funkcja odpala się automatycznie, gdy w kolejce pojawi się nowa wiadomość."""
     dane = json.loads(body)
     book_id = dane.get("book_id")
-    akcja = dane.get("akcja")
-
-    if akcja == "przelicz_trend" and book_id:
-        print(f"[*] Rozpoczynam przeliczanie trendu dla książki ID: {book_id}")
-  
-        db = SessionLocal()
-        try:
-            ksiazka = db.query(Ksiazka).filter(Ksiazka.id == book_id).first()
-            if ksiazka:
-                nowy_trend = wylicz_trend(ksiazka.ilosc_sztuk)
-                ksiazka.trend = nowy_trend
-                db.commit()
-                print(f"[+] Zaktualizowano trend na '{nowy_trend}' dla '{ksiazka.tytul}'")
-            else:
-                print(f"[-] Nie znaleziono książki o ID: {book_id} w bazie.")
-        except Exception as e:
-            print(f"[!] Błąd bazy danych: {e}")
-            db.rollback()  
-        finally:
-            db.close()   
+    
+    db = SessionLocal()
+    try:
+        ksiazka = db.query(models.Ksiazka).filter(models.Ksiazka.id == book_id).first()
+        if ksiazka:
+            nowy_trend = wylicz_trend(db, book_id) 
+            ksiazka.trend = nowy_trend
+            db.commit()
+            print(f"[+] Zaktualizowano trend dla '{ksiazka.tytul}' na '{nowy_trend}' na podstawie sprzedaży z 7 dni")
+        else:
+            print(f"[-] Nie znaleziono książki o ID: {book_id} w bazie.")
+    except Exception as e:
+        print(f"[!] Błąd bazy danych: {e}")
+        db.rollback()  
+    finally:
+        db.close()   
             
     ch.basic_ack(delivery_tag=method.delivery_tag)
 
