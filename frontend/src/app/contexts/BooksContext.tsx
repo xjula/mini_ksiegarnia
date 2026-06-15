@@ -48,6 +48,7 @@ export function BooksProvider({ children }: { children: ReactNode }) {
         reviewCount: 0,  
         trend: 'stable'    
       }));
+      mappedBooks.sort((a: any, b: any) => a.title.localeCompare(b.title));
 
       setBooks(mappedBooks);
     } catch (error) {
