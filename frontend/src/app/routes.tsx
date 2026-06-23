@@ -8,7 +8,8 @@ import { Login } from './pages/Login';
 import { Profile } from './pages/Profile';
 import { Admin } from './pages/Admin';
 import { Trends } from './pages/Trends';
-import { LoginSuccess } from './pages/LoginSuccess'; 
+import { LoginSuccess } from './pages/LoginSuccess';
+import { ProtectedRoute } from './components/ProtectedRoute'; 
 
 function NotFound() {
   return (
@@ -33,7 +34,14 @@ export const router = createBrowserRouter([
       { path: 'checkout', Component: Checkout },
       { path: 'login', Component: Login },
       { path: 'profile', Component: Profile },
-      { path: 'admin', Component: Admin },
+      {
+        path: 'admin',
+        element: (
+          <ProtectedRoute adminOnly>
+            <Admin />
+          </ProtectedRoute>
+        )
+      },
       { path: 'trends', Component: Trends },
       
       { path: 'login-success', Component: LoginSuccess }, 

@@ -17,7 +17,7 @@ class Ksiazka(Base):
     tytul = Column(String, index=True)
     autor = Column(String, index=True)
     opis = Column(String)
-    seria = Column(String, nullable=True)
+    seria = Column(String(255), nullable=True)
     wydawnictwo = Column(String)
     jezyk_wydania = Column(String)
     numer_wydania = Column(Integer)
@@ -37,6 +37,7 @@ class Uzytkownik(Base):
     __tablename__ = "uzytkownicy"
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True)
+    full_name = Column(String(255), nullable=True)
     haslo = Column(String)
     oauth = Column(Boolean, default=False)
     rola = Column(String, default="user")

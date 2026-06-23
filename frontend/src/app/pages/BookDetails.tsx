@@ -4,6 +4,7 @@ import { useBooks } from '../contexts/BooksContext';
 import { useCart } from '../contexts/CartContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export function BookDetails() {
   const { id } = useParams();
@@ -18,17 +19,18 @@ export function BookDetails() {
 
   const book = getBookById(Number(id));
   const reviews = getReviewsByBookId(Number(id));
+  const { t } = useTranslation();
 
   if (!book) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Książka nie znaleziona</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">{t('book.notFound')}</h1>
           <button
             onClick={() => navigate('/')}
-            className="text-blue-600 hover:text-blue-700"
+            className="text-blue-600 hover:text-blue-700 dark:text-blue-400"
           >
-            Wróć do strony głównej
+            {t('book.backToCatalog')}
           </button>
         </div>
       </div>
@@ -51,14 +53,14 @@ export function BookDetails() {
     );
   };
 
-  const handleSubmitReview = (e: React.FormEvent) => {
+  const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) {
       navigate('/login');
       return;
     }
 
-    addReview({
+    await addReview({
       bookId: book.id,
       userId: user.id,
       userName: user.name,
@@ -75,10 +77,10 @@ export function BookDetails() {
     <div className="max-w-7xl mx-auto px-4 py-8">
       <button
         onClick={() => navigate('/')}
-        className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6"
+        className="flex items-center gap-2 text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white mb-6"
       >
         <ArrowLeft className="w-5 h-5" />
-        Powrót do katalogu
+        {t('book.backToCatalog')}
       </button>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
@@ -98,46 +100,42 @@ export function BookDetails() {
 
         <div className="lg:col-span-2">
           <div className="flex items-start justify-between mb-4">
-            <span className="bg-blue-100 text-blue-700 px-4 py-1 rounded-full font-medium">
+            <span className="bg-blue-100 text-blue-700 px-4 py-1 rounded-full font-medium dark:text-white">
               {book.category}
             </span>
-            <span className={`px-3 py-1 rounded-full font-medium ${
+            <span className={`px-3 py-1 rounded-full font-medium dark:text-white ${
               book.stock > 20 ? 'bg-green-100 text-green-700' :
               book.stock > 10 ? 'bg-yellow-100 text-yellow-700' :
               'bg-red-100 text-red-700'
             }`}>
-              W magazynie: {book.stock} szt.
+              {t('book.inStock')}: {book.stock} {t('book.pieces')}
             </span>
           </div>
 
-          <h1 className="font-bold text-4xl text-gray-900 mb-2">{book.title}</h1>
-          <p className="text-xl text-gray-600 mb-6">{book.author}</p>
+          <h1 className="font-bold text-4xl text-gray-900 dark:text-white mb-2">{book.title}</h1>
+          <p className="text-xl text-gray-600 dark:text-slate-400 mb-6">{book.author}</p>
 
           <div className="flex items-center gap-3 mb-6">
             {renderStars(book.rating)}
-            <span className="text-lg text-gray-600">
-              {book.rating.toFixed(1)} ({book.reviewCount} recenzji)
+            <span className="text-lg text-gray-600 dark:text-slate-400">
+              {book.rating.toFixed(1)} ({book.reviewCount} {t('book.reviews')})
             </span>
           </div>
 
-          <p className="text-gray-700 text-lg mb-8">{book.description}</p>
+          <p className="text-gray-700 dark:text-slate-300 text-lg mb-8">{book.description}</p>
 
-          <div className="grid grid-cols-2 gap-4 mb-8 bg-gray-50 p-6 rounded-lg">
+          <div className="grid grid-cols-2 gap-4 mb-8 bg-gray-50 dark:bg-slate-800 p-6 rounded-lg">
             <div>
-              <p className="text-sm text-gray-600">ISBN</p>
-              <p className="font-medium">{book.isbn}</p>
+              <p className="text-sm text-gray-600 dark:text-slate-400">{t('book.publishYear')}</p>
+              <p className="font-medium dark:text-white">{book.publishYear}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-600">Rok wydania</p>
-              <p className="font-medium">{book.publishYear}</p>
+              <p className="text-sm text-gray-600 dark:text-slate-400">{t('book.publisher')}</p>
+              <p className="font-medium dark:text-white">{book.publisher}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-600">Wydawnictwo</p>
-              <p className="font-medium">{book.publisher}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Trend</p>
-              <p className="font-medium">
+              <p className="text-sm text-gray-600 dark:text-slate-400">{t('book.trend')}</p>
+              <p className="font-medium dark:text-white">
                 {book.trend === 'up' ? '📈 Rosnący' :
                  book.trend === 'down' ? '📉 Spadający' : '➡️ Stabilny'}
               </p>
@@ -156,23 +154,23 @@ export function BookDetails() {
               }`}
             >
               <ShoppingCart className="w-6 h-6" />
-              Dodaj do koszyka
+              {t('book.addToCart')}
             </button>
           </div>
         </div>
       </div>
 
-      <div className="border-t pt-8">
+      <div className="border-t dark:border-slate-700 pt-8">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="font-bold text-2xl text-gray-900">
-            Recenzje ({reviews.length})
+          <h2 className="font-bold text-2xl text-gray-900 dark:text-white">
+            {t('book.reviews')} ({reviews.length})
           </h2>
           {user && !showReviewForm && (
             <button
               onClick={() => setShowReviewForm(true)}
               className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             >
-              Dodaj recenzję
+              {t('book.addReview')}
             </button>
           )}
           {!user && (
@@ -180,30 +178,30 @@ export function BookDetails() {
               onClick={() => navigate('/login')}
               className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             >
-              Zaloguj się, aby dodać recenzję
+              {t('book.loginToReview')}
             </button>
           )}
         </div>
 
         {showReviewForm && (
-          <form onSubmit={handleSubmitReview} className="bg-gray-50 p-6 rounded-lg mb-8">
-            <h3 className="font-bold text-lg mb-4">Twoja recenzja</h3>
+          <form onSubmit={handleSubmitReview} className="bg-gray-50 dark:bg-slate-800 p-6 rounded-lg mb-8">
+            <h3 className="font-bold text-lg dark:text-white mb-4">{t('book.yourReview')}</h3>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Ocena
+              <label className="block text-sm font-medium dark:text-white text-gray-700 mb-2">
+                {t('book.rating')}
               </label>
               {renderStars(rating, true, setRating)}
             </div>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Komentarz
+              <label className="block text-sm font-medium dark:text-white text-gray-700 mb-2">
+                {t('book.comment')}
               </label>
               <textarea
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
                 required
                 rows={4}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500"
                 placeholder="Podziel się swoją opinią o książce..."
               />
             </div>
@@ -212,14 +210,14 @@ export function BookDetails() {
                 type="submit"
                 className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
-                Opublikuj recenzję
+                {t('book.publishReview')}
               </button>
               <button
                 type="button"
                 onClick={() => setShowReviewForm(false)}
                 className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
               >
-                Anuluj
+                {t('common.cancel')}
               </button>
             </div>
           </form>
@@ -228,25 +226,25 @@ export function BookDetails() {
         <div className="space-y-6">
           {reviews.length > 0 ? (
             reviews.map((review) => (
-              <div key={review.id} className="bg-white border rounded-lg p-6">
+              <div key={review.id} className="bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg p-6">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center">
-                    <User className="w-6 h-6 text-gray-600" />
+                    <User className="w-6 h-6 text-gray-600 dark:text-slate-400" />
                   </div>
                   <div>
-                    <p className="font-medium text-gray-900">{review.userName}</p>
-                    <p className="text-sm text-gray-500">{review.createdAt}</p>
+                    <p className="font-medium dark:text-white text-gray-900">{review.userName}</p>
+                    <p className="text-sm text-gray-500 dark:text-slate-400">{review.createdAt}</p>
                   </div>
                 </div>
                 <div className="mb-3">
                   {renderStars(review.rating)}
                 </div>
-                <p className="text-gray-700 italic">"{review.comment}"</p>
+                <p className="text-gray-700 dark:text-slate-300 italic">"{review.comment}"</p>
               </div>
             ))
           ) : (
-            <p className="text-center text-gray-500 py-8">
-              Brak recenzji. Bądź pierwszą osobą, która doda recenzję!
+            <p className="text-center text-gray-500 dark:text-slate-400 py-8">
+              {t('book.noReviews')}
             </p>
           )}
         </div>

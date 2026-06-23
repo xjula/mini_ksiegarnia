@@ -5,14 +5,33 @@ export interface Book {
   description: string;
   price: number;
   category: string;
+  categoryId?: number;
   zdjecie_url?: string;
+  cover?: string;
   rating: number;
   reviewCount: number;
   trend: 'up' | 'stable' | 'down';
   stock: number;
-  isbn?: string;
   publishYear?: number;
   publisher?: string;
+  language?: string;
+  edition?: number;
+  publishDate?: string;
+}
+
+export interface BookCreatePayload {
+  tytul: string;
+  autor: string;
+  opis: string;
+  wydawnictwo: string;
+  jezyk_wydania: string;
+  numer_wydania: number;
+  data_premiery: string;
+  okladka: string;
+  cena_jednostkowa: number;
+  ilosc_sztuk: number;
+  kategoria_id: number;
+  trend?: 'up' | 'stable' | 'down';
 }
 
 export interface Review {

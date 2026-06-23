@@ -91,6 +91,9 @@ class ZamowienieResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class ZamowienieStatusUpdate(BaseModel):
+    status: str
+
 # --- RECENZJE ---
 class RecenzjaCreate(BaseModel):
     ocena: int
@@ -117,4 +120,8 @@ class PlatnoscResponse(BaseModel):
     zamowienie_id: int
     class Config:
         from_attributes = True
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    haslo: str
 

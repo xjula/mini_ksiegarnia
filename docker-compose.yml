@@ -1,0 +1,11 @@
+version: '3.8'
+services:
+  rabbitmq_broker:
+    image: rabbitmq:3-management
+    container_name: mini_ksiegarnia_rabbitmq
+    ports:
+      - "5672:5672"      # Port, przez który Python (Celery) gada z kolejką
+      - "15672:15672"    # Port do panelu w przeglądarce
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest

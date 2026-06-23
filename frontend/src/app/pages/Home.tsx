@@ -1,42 +1,50 @@
 import { useState } from 'react';
 import { useBooks } from '../contexts/BooksContext';
 import { BookCard } from '../components/BookCard';
+import { useTranslation } from 'react-i18next';
 
 export function Home() {
   const { books } = useBooks();
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const { t } = useTranslation();
 
   const categories = ['all', ...Array.from(new Set(books.map(b => b.category)))];
 
   const filteredBooks = books.filter(book => {
-    const matchesCategory = selectedCategory === 'all' || book.category === selectedCategory;
-    const matchesSearch = book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         book.author.toLowerCase().includes(searchQuery.toLowerCase());
+    const bookCategory = book.category || ''; 
+    const matchesCategory = selectedCategory === 'all' || bookCategory === selectedCategory;
+
+    const bookTitle = book.title || '';
+    const bookAuthor = book.author || '';
+    
+    const matchesSearch = bookTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         bookAuthor.toLowerCase().includes(searchQuery.toLowerCase());
+                         
     return matchesCategory && matchesSearch;
   });
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="font-bold text-3xl text-gray-900 mb-4">Witaj w Księgarni Online</h1>
-        <p className="text-gray-600">
-          Odkryj bogaty katalog książek - od klasyki po współczesną literaturę
+        <h1 className="font-bold text-3xl text-gray-900 dark:text-white dark:text-white mb-4">{t('homePage.welcome')}</h1>
+        <p className="text-gray-600 dark:text-slate-300 dark:text-slate-300">
+          {t('homePage.description')}
         </p>
       </div>
 
       <div className="mb-8">
         <input
           type="text"
-          placeholder="Szukaj książek po tytule lub autorze..."
+          placeholder={t('homePage.search')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full px-4 py-3 border border-gray-300 dark:border-slate-700 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 dark:bg-slate-900 text-gray-900 dark:text-white dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         />
       </div>
 
       <div className="mb-8">
-        <h2 className="font-bold text-xl text-gray-900 mb-4">Kategorie</h2>
+        <h2 className="font-bold text-xl text-gray-900 dark:text-white dark:text-white mb-4">{t('homePage.categories')}</h2>
         <div className="flex flex-wrap gap-3">
           {categories.map((category) => (
             <button
@@ -45,18 +53,18 @@ export function Home() {
               className={`px-6 py-2 rounded-full font-medium transition-all ${
                 selectedCategory === category
                   ? 'bg-blue-600 text-white shadow-md'
-                  : 'bg-white text-gray-700 hover:bg-gray-100'
+                  : 'bg-white dark:bg-slate-800 text-gray-700 hover::bg-white dark:bg-slate-800 dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-700'
               }`}
             >
-              {category === 'all' ? 'Wszystkie' : category}
+              {category === 'all' ? t('homePage.allCategories') : category}
             </button>
           ))}
         </div>
       </div>
 
       <div className="mb-6">
-        <h2 className="font-bold text-2xl text-gray-900 mb-6">
-          Katalog Książek ({filteredBooks.length})
+        <h2 className="font-bold text-xl text-gray-900 dark:text-white dark:text-white mb-4">
+          {t('homePage.catalog')} ({filteredBooks.length})
         </h2>
       </div>
 
@@ -68,7 +76,7 @@ export function Home() {
         </div>
       ) : (
         <div className="text-center py-16">
-          <p className="text-gray-500 text-lg">Nie znaleziono książek spełniających kryteria</p>
+          <p className="text-gray-600 dark:text-slate-300 dark:text-slate-300">{t('homePage.noResults')}</p>
         </div>
       )}
     </div>

@@ -17,7 +17,7 @@ export function LoginSuccess() {
   }, [searchParams]);
 
   return (
-    <div className="flex h-screen items-center justify-center font-bold text-gray-600">
+    <div className="flex h-screen items-center justify-center font-bold text-gray-600 dark:text-slate-300">
       Autoryzacja OAuth2 zakończona sukcesem. Trwa logowanie...
     </div>
   );

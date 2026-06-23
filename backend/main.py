@@ -13,6 +13,7 @@ import pika
 import json
 import os
 from dotenv import load_dotenv
+from sqlalchemy import func
 
 import httpx
 from fastapi.responses import RedirectResponse
@@ -70,19 +71,59 @@ def dodaj_ksiazke(ksiazka: schemas.KsiazkaCreate, db: Session = Depends(get_db))
     db.refresh(nowa_ksiazka)
     return nowa_ksiazka
 
-@app.get("/ksiazki/", tags=["Książki"])
-async def get_books(db: Session = Depends(get_db)):
-    results = db.query(Ksiazka, Kategoria.nazwa).join(Kategoria).all()
-    
-    books_with_category = []
-    for book, cat_name in results:
-        book_data = {column.name: getattr(book, column.name) for column in book.__table__.columns}
-        book_data["kategoria_nazwa"] = cat_name
-        book_data["trend"] = book.trend
-        
-        books_with_category.append(book_data)
-        
-    return books_with_category
+@app.get("/ksiazki/")
+def get_books(db: Session = Depends(get_db)):
+    # Pobieramy tylko kolumny, które na pewno istnieją w bazie
+    results = db.query(
+        Ksiazka.id,
+        Ksiazka.tytul,
+        Ksiazka.autor,
+        Ksiazka.opis,
+        Ksiazka.wydawnictwo,
+        Ksiazka.jezyk_wydania,
+        Ksiazka.numer_wydania,
+        Ksiazka.data_premiery,
+        Ksiazka.okladka,
+        Ksiazka.cena_jednostkowa,
+        Ksiazka.ilosc_sztuk,
+        Ksiazka.kategoria_id,
+        Ksiazka.trend,
+        Kategoria.nazwa.label("kategoria_nazwa")
+    ).join(Kategoria).all()
+
+    # Zamieniamy to na format zrozumiały dla frontendu
+    books_list = []
+    for book in results:
+        srednia_ocena = db.query(
+            func.avg(models.Recenzja.ocena)
+        ).filter(
+            models.Recenzja.ksiazka_id == book.id
+        ).scalar()
+
+        liczba_recenzji = db.query(
+            models.Recenzja
+        ).filter(
+            models.Recenzja.ksiazka_id == book.id
+        ).count()
+        books_list.append({
+            "id": book.id,
+            "title": book.tytul,
+            "author": book.autor,
+            "description": book.opis,
+            "publisher": book.wydawnictwo,
+            "language": book.jezyk_wydania,
+            "edition": book.numer_wydania,
+            "publishDate": str(book.data_premiery),
+            "cover": book.okladka,
+            "price": float(book.cena_jednostkowa),
+            "stock": book.ilosc_sztuk,
+            "category": book.kategoria_nazwa,
+            "trend": book.trend,
+
+            "rating": round(float(srednia_ocena or 0), 1),
+            "reviewCount": liczba_recenzji
+        })
+    return books_list
 
 
 @app.put("/ksiazki/{ksiazka_id}", response_model=schemas.KsiazkaResponse, tags=["Książki"])
@@ -97,7 +138,6 @@ def edytuj_ksiazke(ksiazka_id: int, ksiazka: schemas.KsiazkaCreate, db: Session 
     db_ksiazka.tytul = ksiazka.tytul
     db_ksiazka.autor = ksiazka.autor
     db_ksiazka.opis = ksiazka.opis
-    db_ksiazka.seria = ksiazka.seria
     db_ksiazka.wydawnictwo = ksiazka.wydawnictwo
     db_ksiazka.okladka = ksiazka.okladka
     db_ksiazka.cena_jednostkowa = ksiazka.cena_jednostkowa
@@ -151,6 +191,88 @@ def pobierz_uzytkownikow(db: Session = Depends(get_db)):
 @app.get("/zamowienia/", response_model=List[schemas.ZamowienieResponse], tags=["Zamówienia"])
 def pobierz_zamowienia(db: Session = Depends(get_db)):
     return db.query(models.Zamowienie).all()
+
+@app.post("/zamowienia/{zamowienie_id}/offline", tags=["Płatności"])
+def ustaw_platnosc_offline(zamowienie_id: int, db: Session = Depends(get_db)):
+    zamowienie = db.query(models.Zamowienie).filter(
+        models.Zamowienie.id == zamowienie_id
+    ).first()
+
+    if not zamowienie:
+        raise HTTPException(status_code=404, detail="Zamówienie nie istnieje")
+
+    zamowienie.status = "OCZEKUJE_NA_PŁATNOŚĆ_OFFLINE"
+
+    platnosc = models.Platnosc(
+        zamowienia_id=zamowienie.id,
+        status="PENDING_OFFLINE",
+        metoda_platnosci="OFFLINE",
+        platnosc_id=None
+    )
+
+    db.add(platnosc)
+    db.commit()
+
+    return {"status": zamowienie.status}
+
+@app.put("/zamowienia/{zamowienie_id}/zatwierdz-offline", tags=["Admin"])
+def zatwierdz_platnosc_offline(zamowienie_id: int, db: Session = Depends(get_db)):
+    zamowienie = db.query(models.Zamowienie).filter(
+        models.Zamowienie.id == zamowienie_id
+    ).first()
+
+    if not zamowienie:
+        raise HTTPException(status_code=404, detail="Zamówienie nie istnieje")
+
+    if zamowienie.status not in ["OCZEKUJE_NA_PŁATNOŚĆ_OFFLINE"]:
+        raise HTTPException(
+            status_code=400,
+            detail="To zamówienie nie oczekuje na płatność offline"
+        )
+
+    zamowienie.status = "OPŁACONE"
+
+    platnosc = db.query(models.Platnosc).filter(
+        models.Platnosc.zamowienia_id == zamowienie.id
+    ).first()
+
+    if platnosc:
+        platnosc.status = "SUCCESS_OFFLINE"
+    else:
+        platnosc = models.Platnosc(
+            zamowienia_id=zamowienie.id,
+            status="SUCCESS_OFFLINE",
+            metoda_platnosci="OFFLINE",
+            platnosc_id=None
+        )
+        db.add(platnosc)
+
+    db.commit()
+
+    return {"status": zamowienie.status}
+
+@app.put("/zamowienia/{zamowienie_id}/status", tags=["Zamówienia"])
+def zmien_status_zamowienia(
+    zamowienie_id: int,
+    dane: schemas.ZamowienieStatusUpdate,
+    db: Session = Depends(get_db)
+):
+    zamowienie = db.query(models.Zamowienie).filter(
+        models.Zamowienie.id == zamowienie_id
+    ).first()
+
+    if not zamowienie:
+        raise HTTPException(status_code=404, detail="Zamówienie nie istnieje")
+
+    zamowienie.status = dane.status
+    db.commit()
+    db.refresh(zamowienie)
+
+    return {
+        "id": zamowienie.id,
+        "status": zamowienie.status,
+        "wiadomosc": "Status zamówienia został zmieniony"
+    }
 
 # --- RECENZJE ---
 
@@ -275,7 +397,7 @@ def zaplac_za_zamowienie(zamowienie_id: int, karta: KartaKredytowa, db: Session 
         nowa_platnosc = models.Platnosc(
             zamowienia_id=zamowienie.id,
             status="SUCCESS",
-            metoda_platnosci="Stripe",
+            metoda_platnosci="ONLINE_STRIPE",
             platnosc_id=intent.id
         )
         db.add(nowa_platnosc)
@@ -394,3 +516,31 @@ async def github_callback(code: str):
     
     # D. Odsyłamy użytkownika na specjalną podstronę w React i podajemy token w adresie URL
     return RedirectResponse(url=f"http://localhost:5173/login-success?token={jwt_token}")
+
+@app.post("/login")
+def login(dane: schemas.LoginRequest, db: Session = Depends(get_db)):
+    uzytkownik = db.query(models.Uzytkownik).filter(
+        models.Uzytkownik.email == dane.email
+    ).first()
+
+    if not uzytkownik:
+        raise HTTPException(status_code=401, detail="Nieprawidłowy email lub hasło")
+
+    if uzytkownik.haslo != dane.haslo:
+        raise HTTPException(status_code=401, detail="Nieprawidłowy email lub hasło")
+
+    return {
+        "id": uzytkownik.id,
+        "email": uzytkownik.email,
+        "full_name": uzytkownik.full_name,
+        "rola": uzytkownik.rola
+    }
+
+@app.get("/uzytkownicy/{uzytkownik_id}/adresy", tags=["Adresy"])
+def pobierz_adresy_uzytkownika(
+    uzytkownik_id: int,
+    db: Session = Depends(get_db)
+):
+    return db.query(models.Adres).filter(
+        models.Adres.uzytkownik_id == uzytkownik_id
+    ).all()

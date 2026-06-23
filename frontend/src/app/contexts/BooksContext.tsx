@@ -1,114 +1,151 @@
-import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { Book, Review } from '../types';
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { Book, BookCreatePayload, Review } from '../types';
 import { apiClient } from '../../api';
 
 interface BooksContextType {
   books: Book[];
   reviews: Review[];
   loading: boolean;
-  fetchBooks: () => Promise<void>; 
+  fetchBooks: () => Promise<void>;
   getBookById: (id: number) => Book | undefined;
   getReviewsByBookId: (bookId: number) => Review[];
-  addBook: (book: Omit<Book, 'id'>) => void;
-  updateBook: (id: number, book: Partial<Book>) => void;
-  deleteBook: (id: number) => void;
-  addReview: (review: Omit<Review, 'id' | 'createdAt'>) => void;
+  addBook: (book: BookCreatePayload) => Promise<void>;
+  updateBook: (id: number, book: BookCreatePayload) => Promise<void>;
+  deleteBook: (id: number) => Promise<void>;
+  addReview: (review: Omit<Review, 'id' | 'createdAt'>) => Promise<void>;
+  fetchReviews: () => Promise<void>;
 }
 
 const BooksContext = createContext<BooksContextType | undefined>(undefined);
+
+const mapApiBook = (b: any): Book => {
+  const publishDate = b.publishDate ?? b.data_premiery ?? '';
+
+  return {
+    id: b.id,
+    title: b.title ?? b.tytul ?? '',
+    author: b.author ?? b.autor ?? '',
+    description: b.description ?? b.opis ?? 'Brak opisu',
+    publisher: b.publisher ?? b.wydawnictwo ?? 'Nieznane',
+    language: b.language ?? b.jezyk_wydania ?? 'polski',
+    edition: b.edition ?? b.numer_wydania ?? 1,
+    publishDate,
+    zdjecie_url: b.zdjecie_url ?? b.cover ?? b.okladka ?? '',
+    cover: b.cover ?? b.okladka ?? b.zdjecie_url ?? '',
+    price: Number(b.price ?? b.cena_jednostkowa ?? 0),
+    stock: Number(b.stock ?? b.ilosc_sztuk ?? 0),
+    categoryId: b.categoryId ?? b.kategoria_id,
+    category: b.category ?? b.kategoria_nazwa ?? String(b.kategoria_id ?? ''),
+    publishYear: publishDate ? new Date(publishDate).getFullYear() : undefined,
+    rating: Number(b.rating ?? b.ocena ?? 5),
+    reviewCount: Number(b.reviewCount ?? b.liczba_recenzji ?? 0),
+    trend: b.trend ?? 'stable'
+  };
+};
 
 export function BooksProvider({ children }: { children: ReactNode }) {
   const [books, setBooks] = useState<Book[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
 
-    const fetchBooks = async () => {
+  const fetchBooks = async () => {
     try {
       setLoading(true);
       const response = await apiClient.get('/ksiazki/');
-
-      const mappedBooks = response.data.map((b: any) => ({
-        id: b.id,
-        title: b.tytul,
-        author: b.autor,
-        description: b.opis || "Brak opisu",
-        series: b.seria || "",
-        publisher: b.wydawnictwo || "Nieznane",
-        language: b.jezyk_wydania || "Polski",
-        edition: b.numer_wydania || 1,
-        publishDate: b.data_premiery,
-        zdjecie_url: b.okladka, 
-        price: b.cena_jednostkowa,
-        stock: b.ilosc_sztuk,
-        categoryId: b.kategoria_id,
-        category: b.kategoria_nazwa,
-        
-        publishYear: b.data_premiery ? new Date(b.data_premiery).getFullYear() : 2024,
-        isbn: "Brak ISBN", 
-        rating: b.ocena || 5.0,       
-        reviewCount: b.liczba_recenzji || 0,    
-        
-  
-        trend: b.trend || 'stable'
-      }));
-
-      mappedBooks.sort((a: any, b: any) => a.title.localeCompare(b.title));
+      const mappedBooks = response.data
+        .map(mapApiBook)
+        .sort((a: Book, b: Book) => a.title.localeCompare(b.title));
 
       setBooks(mappedBooks);
     } catch (error) {
-      console.error("Błąd podczas pobierania książek:", error);
+      console.error('Błąd podczas pobierania książek:', error);
     } finally {
       setLoading(false);
     }
   };
-     
+
   useEffect(() => {
     fetchBooks();
+    fetchReviews();
   }, []);
 
   const getBookById = (id: number) => {
-    return books.find(book => book.id === id);
+    return books.find((book) => book.id === id);
   };
 
   const getReviewsByBookId = (bookId: number) => {
-    return reviews.filter(review => review.bookId === bookId);
+    return reviews.filter((review) => review.bookId === bookId);
   };
 
-  const addBook = (book: Omit<Book, 'id'>) => {
-    const newBook: Book = { ...book, id: Date.now() };
-    setBooks([...books, newBook]);
+  const addBook = async (book: BookCreatePayload) => {
+    await apiClient.post('/ksiazki/', book);
+    await fetchBooks();
   };
 
-  const updateBook = (id: number, updatedBook: Partial<Book>) => {
-    setBooks(books.map(book => book.id === id ? { ...book, ...updatedBook } : book));
+  const updateBook = async (id: number, book: BookCreatePayload) => {
+    await apiClient.put(`/ksiazki/${id}`, book);
+    await fetchBooks();
   };
 
-  const deleteBook = (id: number) => {
-    setBooks(books.filter(book => book.id !== id));
+  const deleteBook = async (id: number) => {
+    try {
+      await apiClient.delete(`/ksiazki/${id}`);
+    } finally {
+      await fetchBooks();
+    }
   };
 
-  const addReview = (review: Omit<Review, 'id' | 'createdAt'>) => {
-    const newReview: Review = {
+  const fetchReviews = async () => {
+    const response = await apiClient.get('/recenzje/');
+
+    const mappedReviews: Review[] = response.data.map((r: any) => ({
+      id: r.id,
+      bookId: r.ksiazka_id,
+      userId: r.uzytkownik_id,
+      userName: `Użytkownik ${r.uzytkownik_id}`,
+      rating: r.ocena,
+      comment: r.komentarz,
+      createdAt: r.data_dodania
+    }));
+
+    setReviews(mappedReviews);
+  };
+
+  const addReview = async (review: Omit<Review, 'id' | 'createdAt'>) => {
+    const response = await apiClient.post('/recenzje/', {
+      ocena: review.rating,
+      komentarz: review.comment,
+      uzytkownik_id: review.userId,
+      ksiazka_id: review.bookId
+    });
+
+    await fetchReviews();
+    await fetchBooks();
+
+    const savedReview: Review = {
       ...review,
-      id: Date.now(),
-      createdAt: new Date().toISOString().split('T')[0]
+      id: response.data.id,
+      createdAt: response.data.data_dodania
     };
-    setReviews([...reviews, newReview]);
+
+    setReviews((prev) => [...prev, savedReview]);
   };
 
   return (
-    <BooksContext.Provider value={{
-      books,
-      reviews,
-      loading,
-      fetchBooks,
-      getBookById,
-      getReviewsByBookId,
-      addBook,
-      updateBook,
-      deleteBook,
-      addReview
-    }}>
+    <BooksContext.Provider
+      value={{
+        books,
+        reviews,
+        loading,
+        fetchBooks,
+        getBookById,
+        getReviewsByBookId,
+        addBook,
+        updateBook,
+        deleteBook,
+        addReview
+      }}
+    >
       {children}
     </BooksContext.Provider>
   );

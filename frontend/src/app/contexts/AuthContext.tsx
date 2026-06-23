@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { User } from '../types';
 import { jwtDecode } from 'jwt-decode'; // Dodany import do czytania tokenów JWT
+import { apiClient } from '../../api';
 
 interface AuthContextType {
   user: User | null;
@@ -41,23 +42,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Twoje dotychczasowe logowanie (Mock) - zostawiamy, żeby działało stare konto admin@ksiegarnia.pl
   const login = async (email: string, password: string) => {
-    await new Promise(resolve => setTimeout(resolve, 500));
+    const response = await apiClient.post('/login', {
+      email,
+      haslo: password
+    });
 
-    if (email === 'admin@ksiegarnia.pl') {
-      setUser({
-        id: 1,
-        email,
-        name: 'Administrator',
-        role: 'admin'
-      });
-    } else {
-      setUser({
-        id: 2,
-        email,
-        name: email.split('@')[0],
-        role: 'user'
-      });
-    }
+    setUser({
+      id: response.data.id,
+      email: response.data.email,
+      name: response.data.full_name || response.data.email.split('@')[0],
+      role: response.data.rola
+    });
   };
 
   // KROK 2: NOWA FUNKCJA - Przekierowanie do backendu FastAPI na logowanie GitHub
@@ -74,12 +69,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const register = async (email: string, password: string, name: string) => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    setUser({
-      id: Date.now(),
+    const response = await apiClient.post('/uzytkownicy/', {
       email,
-      name,
-      role: 'user'
+      full_name: name,
+      haslo: password,
+      oauth: false,
+      rola: 'user'
+    });
+
+    setUser({
+      id: response.data.id,
+      email: response.data.email,
+      name: response.data.full_name || name || email.split('@')[0],
+      role: response.data.rola || 'user'
     });
   };
 

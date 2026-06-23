@@ -41,6 +41,27 @@ def callback(ch, method, properties, body):
         if ksiazka:
             nowy_trend = wylicz_trend(db, book_id) 
             ksiazka.trend = nowy_trend
+            trend_record = db.query(models.Trend).filter(
+                models.Trend.ksiazka_id == book_id
+            ).first()
+
+            sprzedaz = db.query(
+                func.sum(models.KsiazkaZamowienie.ilosc)
+            ).join(models.Zamowienie).filter(
+                models.KsiazkaZamowienie.ksiazka_id == book_id
+            ).scalar() or 0
+
+            if trend_record:
+                trend_record.ocena = float(sprzedaz)
+                trend_record.data_aktualizacji = datetime.utcnow()
+            else:
+                trend_record = models.Trend(
+                    ksiazka_id=book_id,
+                    ocena=float(sprzedaz),
+                    data_aktualizacji=datetime.utcnow()
+                )
+                db.add(trend_record)
+
             db.commit()
             print(f"[+] Zaktualizowano trend dla '{ksiazka.tytul}' na '{nowy_trend}' na podstawie sprzedaży z 7 dni")
         else:

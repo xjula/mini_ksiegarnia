@@ -2,6 +2,7 @@ import { Link } from 'react-router';
 import { Star, ShoppingCart } from 'lucide-react';
 import { Book } from '../types';
 import { useCart } from '../contexts/CartContext';
+import { useTranslation } from 'react-i18next';
 
 interface BookCardProps {
   book: Book;
@@ -9,7 +10,7 @@ interface BookCardProps {
 
 export function BookCard({ book }: BookCardProps) {
   const { addItem } = useCart();
-
+  const { t } = useTranslation();
   const renderStars = (rating: number) => {
     return (
       <div className="flex gap-1">
@@ -26,7 +27,7 @@ export function BookCard({ book }: BookCardProps) {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-shadow">
+    <div className="bg-white dark:bg-slate-900 rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-all border border-transparent dark:border-slate-800">
       <Link to={`/book/${book.id}`}>
         {book.zdjecie_url ? (
           <img 
@@ -50,22 +51,22 @@ export function BookCard({ book }: BookCardProps) {
             book.stock > 10 ? 'bg-yellow-100 text-yellow-700' :
             'bg-red-100 text-red-700'
           }`}>
-            Dostępne: {book.stock} szt.
+            {t('bookCard.available')}: {book.stock} {t('bookCard.pieces')}
           </span>
         </div>
         <Link to={`/book/${book.id}`}>
-          <h3 className="font-bold text-lg mb-1 hover:text-blue-600">{book.title}</h3>
+          <h3 className="font-bold text-lg mb-1 hover:text-blue-600 dark:text-white dark:hover:text-blue-400">{book.title}</h3>
         </Link>
-        <p className="text-sm text-gray-600 mb-3">{book.author}</p>
-        <p className="text-sm text-gray-700 mb-4 line-clamp-2">{book.description}</p>
+        <p className="text-sm text-gray-600 dark:text-slate-400 mb-3">{book.author}</p>
+        <p className="text-sm text-gray-700 dark:text-slate-300 mb-4 line-clamp-2">{book.description}</p>
 
         <div className="flex items-center gap-2 mb-4">
           {renderStars(book.rating)}
-          <span className="text-sm text-gray-600">({book.reviewCount} recenzji)</span>
+          <span className="text-sm text-gray-600 dark:text-slate-400">({book.reviewCount} {t('bookCard.reviews')})</span>
         </div>
 
         <div className="flex items-center justify-between">
-          <span className="font-bold text-2xl text-blue-600">{book.price.toFixed(2)} zł</span>
+          <span className="font-bold text-2xl text-blue-600">{(book.price ?? 0).toFixed(2)} zł</span>
           <button
             onClick={() => addItem(book.id)}
             disabled={book.stock === 0}
@@ -76,7 +77,7 @@ export function BookCard({ book }: BookCardProps) {
             }`}
           >
             <ShoppingCart className="w-4 h-4" />
-            Do koszyka
+            {t('bookCard.addToCart')}
           </button>
         </div>
       </div>
