@@ -189,7 +189,7 @@ export function Login() {
 
             <button
               type="button"
-              onClick={loginWithGitHub}
+              onClick={() => window.location.href = 'http://localhost:8000/auth/login'}
               className="w-full mt-3 bg-gray-900 text-white p-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-800 transition-colors font-bold shadow-md"
             >
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">

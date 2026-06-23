@@ -150,7 +150,7 @@ export function Admin() {
     cena_jednostkowa: Number(formData.price) || 0,
     ilosc_sztuk: Number(formData.stock) || 0,
     kategoria_id: Number(formData.categoryId) || 1,
-    trend: formData.trend
+    trend: '0'
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -404,19 +404,6 @@ export function Admin() {
                   className="w-full px-4 py-2 border border-gray-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">{t('admin.trend')}</label>
-                <select
-                  value={formData.trend}
-                  onChange={(e) => updateField('trend', e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="up"> {t('admin.rising')} </option>
-                  <option value="stable"> {t('admin.stable')} </option>
-                  <option value="down"> {t('admin.falling')} </option>
-                </select>
-              </div>
             </div>
 
             <div>
@@ -481,10 +468,18 @@ export function Admin() {
                     {(book.price ?? 0).toFixed(2)} zł
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{book.stock}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    {book.trend === 'up' && '📈'}
-                    {book.trend === 'down' && '📉'}
-                    {book.trend === 'stable' && '➡️'}
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-bold">
+                    {(() => {
+                      const points = (book as any).trend_score ?? 0;
+                      
+                      if (points >= 20) {
+                        return <span className="text-green-600 dark:text-green-400">📈 +{points} pkt</span>;
+                      } else if (points <= -20) {
+                        return <span className="text-red-600 dark:text-red-400">📉 {points} pkt</span>;
+                      } else {
+                        return <span className="text-gray-500 dark:text-slate-400">➡️ {points >= 0 ? `+${points}` : points} pkt</span>;
+                      }
+                    })()}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <div className="flex gap-2">

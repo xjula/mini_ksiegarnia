@@ -39,7 +39,8 @@ const mapApiBook = (b: any): Book => {
     publishYear: publishDate ? new Date(publishDate).getFullYear() : undefined,
     rating: Number(b.rating ?? b.ocena ?? 5),
     reviewCount: Number(b.reviewCount ?? b.liczba_recenzji ?? 0),
-    trend: b.trend ?? 'stable'
+    trend: b.trend ?? 'stable',
+    trend_score: b.trend_score
   };
 };
 
@@ -102,7 +103,7 @@ export function BooksProvider({ children }: { children: ReactNode }) {
       id: r.id,
       bookId: r.ksiazka_id,
       userId: r.uzytkownik_id,
-      userName: `Użytkownik ${r.uzytkownik_id}`,
+      userName: r.uzytkownik_name,
       rating: r.ocena,
       comment: r.komentarz,
       createdAt: r.data_dodania

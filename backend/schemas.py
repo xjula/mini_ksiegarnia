@@ -104,6 +104,7 @@ class RecenzjaCreate(BaseModel):
 class RecenzjaResponse(RecenzjaCreate):
     id: int
     data_dodania: datetime
+    user_name: Optional[str] = None
     class Config:
         from_attributes = True
 

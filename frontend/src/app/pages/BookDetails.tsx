@@ -233,7 +233,15 @@ export function BookDetails() {
                   </div>
                   <div>
                     <p className="font-medium dark:text-white text-gray-900">{review.userName}</p>
-                    <p className="text-sm text-gray-500 dark:text-slate-400">{review.createdAt}</p>
+                    <p className="text-sm text-gray-500 dark:text-slate-400">
+                    {review.createdAt 
+                      ? new Date(review.createdAt).toLocaleDateString('pl-PL', {
+                          year: 'numeric',
+                          month: '2-digit',
+                          day: '2-digit'
+                        })
+                      : ''}
+                  </p>
                   </div>
                 </div>
                 <div className="mb-3">

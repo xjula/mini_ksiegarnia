@@ -17,6 +17,7 @@ export interface Book {
   language?: string;
   edition?: number;
   publishDate?: string;
+  trend_score?: number;
 }
 
 export interface BookCreatePayload {

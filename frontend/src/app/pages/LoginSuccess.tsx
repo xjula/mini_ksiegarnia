@@ -10,7 +10,27 @@ export function LoginSuccess() {
     if (token) {
       localStorage.setItem('token', token); 
       console.log("Token został pomyślnie zapisany!");
-      window.location.href = '/'; // Przekierowujemy usera na stronę główną jako zalogowanego
+
+      try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(
+          window.atob(base64)
+            .split('')
+            .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+            .join('')
+        );
+
+        const userData = JSON.parse(jsonPayload);
+        console.log("Rozkodowany użytkownik z GitHub:", userData);
+
+        localStorage.setItem('user', JSON.stringify(userData));
+
+      } catch (error) {
+        console.error("Błąd dekodowania tokenu JWT:", error);
+      }
+
+      window.location.href = '/'; 
     } else {
       window.location.href = '/login';
     }
