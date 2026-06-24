@@ -1,11 +1,24 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { User, Mail, Shield } from 'lucide-react';
+import { User, Mail, Shield, Package } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
+import { apiClient } from '../../api';
 export function Profile() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { t } = useTranslation();
+
+  const [orders, setOrders] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    apiClient
+      .get(`/uzytkownicy/${user.id}/zamowienia`)
+      .then((res) => setOrders(res.data))
+      .catch((err) => console.error('Błąd pobierania zamówień:', err));
+  }, [user]);
 
   if (!user) {
     navigate('/login');
@@ -71,6 +84,53 @@ export function Profile() {
             <span className="font-medium text-gray-900 dark:text-white">OAuth2 / Email</span>
           </div>
         </div>
+      </div>
+
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-md p-8 mt-6">
+        <div className="flex items-center gap-3 mb-6">
+          <Package className="w-6 h-6 text-blue-600" />
+          <h2 className="font-bold text-xl text-gray-900 dark:text-white">
+            Moje zamówienia
+          </h2>
+        </div>
+
+        {orders.length === 0 ? (
+          <p className="text-gray-600 dark:text-slate-300">
+            Nie masz jeszcze żadnych zamówień.
+          </p>
+        ) : (
+          <div className="space-y-4">
+            {orders.map((order) => (
+              <div
+                key={order.id}
+                className="border dark:border-slate-700 rounded-lg p-4"
+              >
+                <div className="flex justify-between items-center mb-2">
+                  <span className="font-bold text-gray-900 dark:text-white">
+                    Zamówienie #{order.id}
+                  </span>
+                  <span className="px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-700">
+                    {order.status}
+                  </span>
+                </div>
+
+                <p className="text-gray-600 dark:text-slate-300">
+                  Kwota: {Number(order.cena_calkowita || 0).toFixed(2)} zł
+                </p>
+
+                <p className="text-gray-600 dark:text-slate-300">
+                  Dostawa: {Number(order.koszt_dostawy || 0).toFixed(2)} zł
+                </p>
+
+                <p className="text-gray-500 dark:text-slate-400 text-sm">
+                  Data: {order.data_zamowienia
+                    ? new Date(order.data_zamowienia).toLocaleString('pl-PL')
+                    : 'brak daty'}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {user.role === 'admin' && (

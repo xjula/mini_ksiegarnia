@@ -9,8 +9,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from models import Ksiazka, Kategoria
 from pydantic import BaseModel
 from fastapi import HTTPException
-import pika
-import json
 import os
 from dotenv import load_dotenv
 from sqlalchemy import func
@@ -19,6 +17,12 @@ import httpx
 from fastapi.responses import RedirectResponse
 from jose import jwt
 from datetime import datetime, timedelta, timezone
+from services.trend_service import aktualizuj_trend_w_bazie
+from services import address_service
+from services import book_service
+from services import order_service
+from services import payment_service
+from services import review_service
 
 load_dotenv()
 models.Base.metadata.create_all(bind=engine)
@@ -40,37 +44,9 @@ class Item(BaseModel):
     ilosc: int
 
 class Order(BaseModel):
+    uzytkownik_id: int
     produkty: List[Item]
-    koszt_dostawy: float = 0.0  
-
-
-def aktualizuj_trend_w_bazie(book_id: int, db: Session):
-    db_book = db.query(models.Ksiazka).filter(models.Ksiazka.id == book_id).first()
-    if not db_book:
-        return
-
-    score = 0
-    wszystkie_recenzje = db.query(models.Recenzja).filter(models.Recenzja.ksiazka_id == book_id).all()
-    for r in wszystkie_recenzje:
-        if r.ocena == 5: score += 10
-        elif r.ocena == 4: score += 5
-        elif r.ocena == 2: score -= 5
-        elif r.ocena == 1: score -= 10
-
-    if db_book.ilosc_sztuk <= 5:
-        score += 30
-    elif db_book.ilosc_sztuk > 20:
-        score -= 10
-
-    if score >= 20:
-        nowy_trend = "up"
-    elif score <= -20:
-        nowy_trend = "down"
-    else:
-        nowy_trend = "stable"
-
-    db_book.trend = nowy_trend
-    db.commit()
+    koszt_dostawy: float = 0.0 
 
 # --- KATEGORIE ---
 @app.post("/kategorie/", response_model=schemas.KategoriaResponse, tags=["Kategorie"])
@@ -88,123 +64,24 @@ def pobierz_kategorie(db: Session = Depends(get_db)):
 # --- KSIĄŻKI ---
 @app.post("/ksiazki/", response_model=schemas.KsiazkaResponse, tags=["Książki"])
 def dodaj_ksiazke(ksiazka: schemas.KsiazkaCreate, db: Session = Depends(get_db)):
-    kategoria_istnieje = db.query(models.Kategoria).filter(models.Kategoria.id == ksiazka.kategoria_id).first()
-    if not kategoria_istnieje:
-        raise HTTPException(status_code=404, detail="Podana kategoria nie istnieje!")
-
-    nowa_ksiazka = models.Ksiazka(**ksiazka.model_dump())
-    db.add(nowa_ksiazka)
-    db.commit()
-    db.refresh(nowa_ksiazka)
-    return nowa_ksiazka
+    return book_service.dodaj_ksiazke(ksiazka, db)
 
 @app.get("/ksiazki/", tags=["Książki"])
 def get_books(db: Session = Depends(get_db)):
-    results = db.query(
-        Ksiazka.id,
-        Ksiazka.tytul,
-        Ksiazka.autor,
-        Ksiazka.opis,
-        Ksiazka.wydawnictwo,
-        Ksiazka.jezyk_wydania,
-        Ksiazka.numer_wydania,
-        Ksiazka.data_premiery,
-        Ksiazka.okladka,
-        Ksiazka.cena_jednostkowa,
-        Ksiazka.ilosc_sztuk,
-        Ksiazka.kategoria_id,
-        Ksiazka.trend,
-        Kategoria.nazwa.label("kategoria_nazwa")
-    ).join(Kategoria).all()
-
-    books_list = []
-    for book in results:
-        aktualizuj_trend_w_bazie(book.id, db)
-        srednia_ocena = db.query(
-            func.avg(models.Recenzja.ocena)
-        ).filter(
-            models.Recenzja.ksiazka_id == book.id
-        ).scalar()
-
-        liczba_recenzji = db.query(
-            models.Recenzja
-        ).filter(
-            models.Recenzja.ksiazka_id == book.id
-        ).count()
-        
-        wyliczona_ocena = round(float(srednia_ocena or 0), 1)
-
-        score = 0
-        wszystkie_recenzje = db.query(models.Recenzja).filter(models.Recenzja.ksiazka_id == book.id).all()
-        for r in wszystkie_recenzje:
-            if r.ocena == 5: score += 10
-            elif r.ocena == 4: score += 5
-            elif r.ocena == 2: score -= 5
-            elif r.ocena == 1: score -= 10
-
-        if book.ilosc_sztuk <= 5:
-            score += 30
-        elif book.ilosc_sztuk > 20:
-            score -= 10 
-
-        books_list.append({
-            "id": book.id,
-            "title": book.tytul,
-            "author": book.autor,
-            "description": book.opis,
-            "publisher": book.wydawnictwo,
-            "language": book.jezyk_wydania,
-            "edition": book.numer_wydania,
-            "publishDate": str(book.data_premiery),
-            "cover": book.okladka,
-            "price": float(book.cena_jednostkowa),
-            "stock": book.ilosc_sztuk,
-            "category": book.kategoria_nazwa,
-            "trend": str(book.trend or "stable"),
-            "trend_score": score,
-            "rating": wyliczona_ocena,
-            "reviewCount": liczba_recenzji
-        })
-        
-    return books_list
+    return book_service.pobierz_ksiazki(db)
 
 
 @app.put("/ksiazki/{book_id}")
-def edytuj_ksiazke(book_id: int, book_update: schemas.KsiazkaCreate, db: Session = Depends(get_db)):
-    db_book = db.query(models.Ksiazka).filter(models.Ksiazka.id == book_id).first()
-    if not db_book:
-        raise HTTPException(status_code=404, detail="Nie znaleziono książki")
-        
-    db_book.tytul = book_update.tytul
-    db_book.autor = book_update.autor
-    db_book.opis = book_update.opis
-    db_book.cena_jednostkowa = book_update.cena_jednostkowa
-    db_book.ilosc_sztuk = book_update.ilosc_sztuk
-    db_book.kategoria_id = book_update.kategoria_id
-    db_book.wydawnictwo = book_update.wydawnictwo
-    db_book.jezyk_wydania = book_update.jezyk_wydania
-    db_book.numer_wydania = book_update.numer_wydania
-    db_book.okladka = book_update.okladka
-    
-    db_book.trend = book_update.trend  
-    
-    db.commit()
-    db.refresh(db_book)
-    return db_book
-
+def edytuj_ksiazke(
+    book_id: int,
+    book_update: schemas.KsiazkaCreate,
+    db: Session = Depends(get_db)
+):
+    return book_service.edytuj_ksiazke(book_id, book_update, db)
 
 @app.delete("/ksiazki/{ksiazka_id}", response_model=schemas.KsiazkaResponse, tags=["Książki"])
 def usun_ksiazke(ksiazka_id: int, db: Session = Depends(get_db)):
-    # 1. Szukamy książki
-    db_ksiazka = db.query(models.Ksiazka).filter(models.Ksiazka.id == ksiazka_id).first()
-    
-    if not db_ksiazka:
-        raise HTTPException(status_code=404, detail="Podana książka nie istnieje!")
-
-    # 2. Usuwamy ją z bazy
-    db.delete(db_ksiazka)
-    db.commit()
-    return {"wiadomosc": f"Książka o ID {ksiazka_id} została pomyślnie usunięta."}
+    return book_service.usun_ksiazke(ksiazka_id, db)
 
 # --- UŻYTKOWNICY ---
 
@@ -230,69 +107,27 @@ def stworz_uzytkownika(uzytkownik: schemas.UzytkownikCreate, db: Session = Depen
 def pobierz_uzytkownikow(db: Session = Depends(get_db)):
     return db.query(models.Uzytkownik).all()
 
+@app.get("/uzytkownicy/{uzytkownik_id}/zamowienia", tags=["Zamówienia"])
+def pobierz_zamowienia_uzytkownika(
+    uzytkownik_id: int,
+    db: Session = Depends(get_db)
+):
+    return order_service.pobierz_zamowienia_uzytkownika(
+        uzytkownik_id,
+        db
+    )
 
 @app.get("/zamowienia/", response_model=List[schemas.ZamowienieResponse], tags=["Zamówienia"])
 def pobierz_zamowienia(db: Session = Depends(get_db)):
-    return db.query(models.Zamowienie).all()
+    return order_service.pobierz_zamowienia(db)
 
 @app.post("/zamowienia/{zamowienie_id}/offline", tags=["Płatności"])
 def ustaw_platnosc_offline(zamowienie_id: int, db: Session = Depends(get_db)):
-    zamowienie = db.query(models.Zamowienie).filter(
-        models.Zamowienie.id == zamowienie_id
-    ).first()
-
-    if not zamowienie:
-        raise HTTPException(status_code=404, detail="Zamówienie nie istnieje")
-
-    zamowienie.status = "OCZEKUJE_NA_PŁATNOŚĆ_OFFLINE"
-
-    platnosc = models.Platnosc(
-        zamowienia_id=zamowienie.id,
-        status="PENDING_OFFLINE",
-        metoda_platnosci="OFFLINE",
-        platnosc_id=None
-    )
-
-    db.add(platnosc)
-    db.commit()
-
-    return {"status": zamowienie.status}
+    return payment_service.ustaw_platnosc_offline(zamowienie_id, db)
 
 @app.put("/zamowienia/{zamowienie_id}/zatwierdz-offline", tags=["Admin"])
 def zatwierdz_platnosc_offline(zamowienie_id: int, db: Session = Depends(get_db)):
-    zamowienie = db.query(models.Zamowienie).filter(
-        models.Zamowienie.id == zamowienie_id
-    ).first()
-
-    if not zamowienie:
-        raise HTTPException(status_code=404, detail="Zamówienie nie istnieje")
-
-    if zamowienie.status not in ["OCZEKUJE_NA_PŁATNOŚĆ_OFFLINE"]:
-        raise HTTPException(
-            status_code=400,
-            detail="To zamówienie nie oczekuje na płatność offline"
-        )
-
-    zamowienie.status = "OPŁACONE"
-
-    platnosc = db.query(models.Platnosc).filter(
-        models.Platnosc.zamowienia_id == zamowienie.id
-    ).first()
-
-    if platnosc:
-        platnosc.status = "SUCCESS_OFFLINE"
-    else:
-        platnosc = models.Platnosc(
-            zamowienia_id=zamowienie.id,
-            status="SUCCESS_OFFLINE",
-            metoda_platnosci="OFFLINE",
-            platnosc_id=None
-        )
-        db.add(platnosc)
-
-    db.commit()
-
-    return {"status": zamowienie.status}
+    return payment_service.zatwierdz_platnosc_offline(zamowienie_id, db)
 
 @app.put("/zamowienia/{zamowienie_id}/status", tags=["Zamówienia"])
 def zmien_status_zamowienia(
@@ -300,170 +135,44 @@ def zmien_status_zamowienia(
     dane: schemas.ZamowienieStatusUpdate,
     db: Session = Depends(get_db)
 ):
-    zamowienie = db.query(models.Zamowienie).filter(
-        models.Zamowienie.id == zamowienie_id
-    ).first()
-
-    if not zamowienie:
-        raise HTTPException(status_code=404, detail="Zamówienie nie istnieje")
-
-    zamowienie.status = dane.status
-    db.commit()
-    db.refresh(zamowienie)
-
-    return {
-        "id": zamowienie.id,
-        "status": zamowienie.status,
-        "wiadomosc": "Status zamówienia został zmieniony"
-    }
+    return order_service.zmien_status_zamowienia(zamowienie_id, dane, db)
 
 # --- RECENZJE ---
 
 @app.post("/recenzje/", tags=["Recenzje"])
-def dodaj_recenzje(recenzja: schemas.RecenzjaCreate, db: Session = Depends(get_db)):
-    nowa_recenzja = models.Recenzja(**recenzja.model_dump())
-    db.add(nowa_recenzja)
-    db.commit()
-    db.refresh(nowa_recenzja)
-    
-    db_uzytkownik = db.query(models.Uzytkownik).filter(models.Uzytkownik.id == recenzja.uzytkownik_id).first()
-    pelna_nazwa = db_uzytkownik.full_name if db_uzytkownik else "Użytkownik"
-    
-    srednia_ocena = db.query(func.avg(models.Recenzja.ocena)).filter(models.Recenzja.ksiazka_id == recenzja.ksiazka_id).scalar()
-    wyliczona_srednia = round(float(srednia_ocena or 0), 2)
-    
-    nowy_wpis_trendu = models.Trend(ksiazka_id=recenzja.ksiazka_id, ocena=wyliczona_srednia, data_aktualizacji=datetime.utcnow())
-    db.add(nowy_wpis_trendu)
-    db.commit()
-    
-    aktualizuj_trend_w_bazie(recenzja.ksiazka_id, db)
-
-    return {
-        "id": nowa_recenzja.id,
-        "ksiazka_id": nowa_recenzja.ksiazka_id,
-        "uzytkownik_id": nowa_recenzja.uzytkownik_id,
-        "ocena": nowa_recenzja.ocena,
-        "komentarz": nowa_recenzja.komentarz,
-        "data_dodania": nowa_recenzja.data_dodania,
-        "uzytkownik_name": pelna_nazwa
-    }
+def dodaj_recenzje(
+    recenzja: schemas.RecenzjaCreate,
+    db: Session = Depends(get_db)
+):
+    return review_service.dodaj_recenzje(recenzja, db)
 
 @app.get("/recenzje/", tags=["Recenzje"])
 def pobierz_recenzje(db: Session = Depends(get_db)):
-    results = db.query(models.Recenzja, models.Uzytkownik.full_name).\
-        join(models.Uzytkownik, models.Recenzja.uzytkownik_id == models.Uzytkownik.id).all()
-
-    wynik = []
-    for recenzja, full_name in results:
-        wynik.append({
-            "id": recenzja.id,
-            "ksiazka_id": recenzja.ksiazka_id,
-            "uzytkownik_id": recenzja.uzytkownik_id,
-            "ocena": recenzja.ocena,
-            "komentarz": recenzja.komentarz,
-            "data_dodania": recenzja.data_dodania,
-            # Przekazujemy czysty, jasny klucz z bazy danych:
-            "uzytkownik_name": full_name if full_name else f"Użytkownik {recenzja.uzytkownik_id}"
-        })
-        
-    return wynik
+    return review_service.pobierz_recenzje(db)
 
 @app.delete("/recenzje/{recenzja_id}", tags=["Recenzje"])
-def usun_recenzje(recenzja_id: int, db: Session = Depends(get_db)):
-    db_recenzja = db.query(models.Recenzja).filter(models.Recenzja.id == recenzja_id).first()
-    if not db_recenzja:
-        raise HTTPException(status_code=404, detail="Nie znaleziono takiej recenzji.")
-    
-    ksiazka_id = db_recenzja.ksiazka_id
-
-    db.delete(db_recenzja)
-    db.commit()
-
-    srednia_ocena = db.query(func.avg(models.Recenzja.ocena)).filter(models.Recenzja.ksiazka_id == ksiazka_id).scalar()
-    wyliczona_srednia = round(float(srednia_ocena or 0), 2)
-    
-    nowy_wpis_trendu = models.Trend(
-        ksiazka_id=ksiazka_id,
-        ocena=wyliczona_srednia,
-        data_aktualizacji=datetime.utcnow()
-    )
-    db.add(nowy_wpis_trendu)
-    db.commit()
-    aktualizuj_trend_w_bazie(ksiazka_id, db)
-
+def usun_recenzje(
+    recenzja_id: int,
+    db: Session = Depends(get_db)
+):
+    return review_service.usun_recenzje(recenzja_id, db)
 
 # --- ADRESY ---
-
 @app.post("/adresy/", response_model=schemas.AdresResponse, tags=["Adresy"])
 def dodaj_adres(adres: schemas.AdresCreate, db: Session = Depends(get_db)):
-    nowy_adres = models.Adres(**adres.dict())
-    db.add(nowy_adres)
-    db.commit()
-    db.refresh(nowy_adres)
-    return nowy_adres
+    return address_service.dodaj_adres(adres, db)
 
 @app.get("/adresy/", response_model=List[schemas.AdresResponse], tags=["Adresy"])
 def pobierz_adresy(db: Session = Depends(get_db)):
-    return db.query(models.Adres).all()
+    return address_service.pobierz_adresy(db)
 
 @app.get("/zamowienia/{zamowienie_id}", response_model=schemas.ZamowienieResponse, tags=["Zamówienia"])
 def pobierz_zamowienie(zamowienie_id: int, db: Session = Depends(get_db)):
-    zamowienie = db.query(models.Zamowienie).filter(models.Zamowienie.id == zamowienie_id).first()
-    if not zamowienie:
-        raise HTTPException(status_code=404, detail="Zamówienie nie istnieje")
-    return zamowienie
+    return order_service.pobierz_zamowienie(zamowienie_id, db)
+
 @app.post("/zamowienia/", tags=["Zamówienia"])
 async def stworz_zamowienie(zamowienie: Order, db: Session = Depends(get_db)):
-    laczna_cena = 0.0 
-    kupione_ksiazki_ids = []
-
-    nowe_zamowienie = models.Zamowienie(
-        status="PENDING", 
-        cena_calkowita=0.0, 
-        koszt_dostawy=zamowienie.koszt_dostawy
-    ) 
-    db.add(nowe_zamowienie)
-    db.commit() 
-    db.refresh(nowe_zamowienie) 
-
-    for item in zamowienie.produkty:
-        db_book = db.query(Ksiazka).filter(Ksiazka.id == item.id_ksiazki).first()
-        if db_book:
-            laczna_cena += (db_book.cena_jednostkowa * item.ilosc)
-            db_book.ilosc_sztuk -= item.ilosc
-            kupione_ksiazki_ids.append(item.id_ksiazki)
-            
-
-            nowa_pozycja = models.KsiazkaZamowienie(
-                zamowienia_id=nowe_zamowienie.id,
-                ksiazka_id=db_book.id,
-                ilosc=item.ilosc,
-                cena=db_book.cena_jednostkowa
-            )
-            db.add(nowa_pozycja)
-    
-    nowe_zamowienie.cena_calkowita = laczna_cena + zamowienie.koszt_dostawy
-    db.commit() 
-    aktualizuj_trend_w_bazie(db_book.id, db)
-
-    # --- WYSYŁKA ZADAŃ DO RABBITMQ ---
-    try:
-        url = os.getenv("RABBITMQ_URL")
-        params = pika.URLParameters(url)
-        connection = pika.BlockingConnection(params)
-        channel = connection.channel()
-        channel.queue_declare(queue='trendy_kolejka')
-
-        for book_id in kupione_ksiazki_ids:
-            wiadomosc = {"book_id": book_id, "akcja": "przelicz_trend"}
-            channel.basic_publish(exchange='', routing_key='trendy_kolejka', body=json.dumps(wiadomosc))
-        
-        connection.close()
-    except Exception as rabbit_err:
-        print(f"Błąd RabbitMQ: {rabbit_err}")
-    
-    return {"status": "success", "zamowienie_id": nowe_zamowienie.id}
-    
+    return order_service.stworz_zamowienie(zamowienie, db)
 
 # --- PŁATNOŚCI STRIPE ---
 
@@ -472,73 +181,12 @@ class KartaKredytowa(BaseModel):
     metoda_platnosci: str = "pm_card_visa" 
 
 @app.post("/zamowienia/{zamowienie_id}/zaplac", tags=["Płatności"])
-def zaplac_za_zamowienie(zamowienie_id: int, karta: KartaKredytowa, db: Session = Depends(get_db)):
-    # 1. Szukamy zamówienia w bazie
-    zamowienie = db.query(models.Zamowienie).filter(models.Zamowienie.id == zamowienie_id).first()
-    
-    if not zamowienie:
-        raise HTTPException(status_code=404, detail="Zamówienie nie istnieje")
-        
-    if zamowienie.status == "OPŁACONE":
-        raise HTTPException(status_code=400, detail="To zamówienie zostało już opłacone.")
-
-    # 2. Pobieramy prawdziwą cenę z zamówienia w bazie i zamieniamy na grosze dla Stripe
-    kwota_w_groszach = int(round(zamowienie.cena_calkowita * 100))
-
-    # 3. Próba obciążenia karty 
-    try:
-        intent = stripe.PaymentIntent.create(
-            amount=kwota_w_groszach,
-            currency="pln",
-            payment_method=karta.metoda_platnosci,
-            payment_method_types=["card"],
-            confirm=True 
-        )
-        
-       # --- SCENARIUSZ POZYTYWNY ---
-        zamowienie.status = "OPŁACONE"
-        
-        # Zapisujemy dowód płatności w bazie
-        nowa_platnosc = models.Platnosc(
-            zamowienia_id=zamowienie.id,
-            status="SUCCESS",
-            metoda_platnosci="ONLINE_STRIPE",
-            platnosc_id=intent.id
-        )
-        db.add(nowa_platnosc)
-        db.commit()
-
-        try:
-            url = os.getenv("RABBITMQ_URL")
-            params = pika.URLParameters(url)
-            connection = pika.BlockingConnection(params)
-            channel = connection.channel()
-
-            channel.queue_declare(queue='platnosci')
-
-            wiadomosc = {
-                "zamowienie_id": zamowienie_id,
-                "status": "OPŁACONE",
-                "kwota": kwota_w_groszach / 100 
-            }
-
-            channel.basic_publish(
-                exchange='',
-                routing_key='platnosci',
-                body=json.dumps(wiadomosc)
-            )
-            print(f"Sukces: Wysłano do RabbitMQ dla zamówienia {zamowienie_id}")
-            connection.close()
-        except Exception as rabbit_err:
-            print(f"Błąd RabbitMQ: {rabbit_err}")
-        # -------------------------------------
-        
-        return {"wiadomosc": "Płatność zakończona sukcesem!", "status": zamowienie.status}
-    except stripe.error.CardError as e:
-        raise HTTPException(status_code=400, detail=f"Błąd karty: {str(e)}")
-    except stripe.error.StripeError as e:
-        raise HTTPException(status_code=400, detail=f"Błąd Stripe: {str(e)}")
-    
+def zaplac_za_zamowienie(
+    zamowienie_id: int,
+    karta: KartaKredytowa,
+    db: Session = Depends(get_db)
+):
+    return payment_service.zaplac_za_zamowienie(zamowienie_id, karta, db)
 
 #Logowanie
 
@@ -653,6 +301,4 @@ def pobierz_adresy_uzytkownika(
     uzytkownik_id: int,
     db: Session = Depends(get_db)
 ):
-    return db.query(models.Adres).filter(
-        models.Adres.uzytkownik_id == uzytkownik_id
-    ).all()
+    return address_service.pobierz_adresy_uzytkownika(uzytkownik_id, db)

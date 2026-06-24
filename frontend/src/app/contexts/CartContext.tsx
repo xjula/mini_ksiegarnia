@@ -2,6 +2,7 @@ import { createContext, useContext, useReducer, ReactNode } from 'react';
 import { CartItem } from '../types';
 import { useBooks } from './BooksContext'; 
 import { apiClient } from '../../api';
+import { useAuth } from './AuthContext';
 
 interface CartState {
   items: CartItem[];
@@ -76,6 +77,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
 export function CartProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(cartReducer, { items: [] });
   const { books } = useBooks();
+  const { user } = useAuth();
 
   const addItem = (bookId: number) => {
     const book = books.find(b => b.id === bookId);
@@ -95,12 +97,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
     
     try {
       const orderPayload = {
+        uzytkownik_id: user?.id,
         produkty: state.items.map(item => ({
           id_ksiazki: item.bookId,
           ilosc: item.quantity
         })),
-        koszt_dostawy: deliveryCost, 
-        data_zamowienia: new Date().toISOString()
+        koszt_dostawy: deliveryCost
       };
       
       const response = await apiClient.post('/zamowienia/', orderPayload);
