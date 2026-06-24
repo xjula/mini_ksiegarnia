@@ -257,7 +257,7 @@ export function Admin() {
       {showForm && (
       <>
         <div className="bg-white dark:bg-slate-800 rounded-lg shadow-md p-6 mb-8">
-          <h2 className="font-bold text-xl mb-4">{t('admin.addCategory')}</h2>
+          <h2 className="font-bold text-xl text-gray-900 dark:text-white mb-4">{t('admin.addCategory')}</h2>
 
           <form onSubmit={handleAddCategory} className="flex gap-3">
             <input
@@ -279,36 +279,36 @@ export function Admin() {
         </div>
 
         <div className="bg-white dark:bg-slate-800 rounded-lg shadow-md p-6 mb-8">
-          <h2 className="font-bold text-xl mb-6">
+          <h2 className="font-bold text-xl text-gray-900 dark:text-white mb-6">
             {editingBook ? t('admin.editBook') : t('admin.addNewBook')}
           </h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">{t('admin.titleLabel')} *</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">{t('admin.titleLabel')} *</label>
                 <input
                   type="text"
                   value={formData.title}
                   onChange={(e) => updateField('title', e.target.value)}
                   required
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">{t('admin.author')} *</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">{t('admin.author')} *</label>
                 <input
                   type="text"
                   value={formData.author}
                   onChange={(e) => updateField('author', e.target.value)}
                   required
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">{t('admin.price')} *</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">{t('admin.price')} *</label>
                 <input
                   type="number"
                   min="0"
@@ -316,24 +316,24 @@ export function Admin() {
                   value={formData.price}
                   onChange={(e) => updateField('price', e.target.value)}
                   required
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">{t('admin.stock')} *</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">{t('admin.stock')} *</label>
                 <input
                   type="number"
                   min="0"
                   value={formData.stock}
                   onChange={(e) => updateField('stock', e.target.value)}
                   required
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
                   {t('admin.category')}
                 </label>
 
@@ -341,7 +341,7 @@ export function Admin() {
                   value={formData.categoryId}
                   onChange={(e) => updateField('categoryId', e.target.value)}
                   required
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
                   <option value=""> {t('admin.selectCategory')} </option>
 
@@ -355,65 +355,65 @@ export function Admin() {
 
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">{t('admin.publisher')}</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">{t('admin.publisher')}</label>
                 <input
                   type="text"
                   value={formData.publisher}
                   onChange={(e) => updateField('publisher', e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">{t('admin.language')}</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">{t('admin.language')}</label>
                 <input
                   type="text"
                   value={formData.language}
                   onChange={(e) => updateField('language', e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">{t('admin.edition')}</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">{t('admin.edition')}</label>
                 <input
                   type="number"
                   min="1"
                   value={formData.editionNumber}
                   onChange={(e) => updateField('editionNumber', e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">{t('admin.releaseDate')}</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">{t('admin.releaseDate')}</label>
                 <input
                   type="date"
                   value={formData.releaseDate}
                   onChange={(e) => updateField('releaseDate', e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">{t('admin.coverUrl')}</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">{t('admin.coverUrl')}</label>
                 <input
                   type="text"
                   value={formData.cover}
                   onChange={(e) => updateField('cover', e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">{t('admin.descriptionLabel')}</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">{t('admin.descriptionLabel')}</label>
               <textarea
                 value={formData.description}
                 onChange={(e) => updateField('description', e.target.value)}
                 required
                 rows={3}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500"
               />
             </div>
 
@@ -428,7 +428,7 @@ export function Admin() {
               <button
                 type="button"
                 onClick={resetForm}
-                className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                className="px-6 py-2 bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-slate-600"
               >
                 {t('admin.cancel')}
               </button>
@@ -514,8 +514,8 @@ export function Admin() {
         </div>
       </div>
       <div className="bg-white dark:bg-slate-800 rounded-lg shadow-md overflow-hidden mt-10">
-        <div className="p-6 border-b">
-          <h2 className="text-2xl font-bold">
+        <div className="p-6 border-b dark:border-slate-700">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
             Zamówienia
           </h2>
         </div>
