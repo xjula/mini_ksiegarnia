@@ -4,96 +4,99 @@ import pika
 from dotenv import load_dotenv
 from sqlalchemy.orm import sessionmaker
 from database import engine  
-from models import Ksiazka
+import models 
 from datetime import datetime, timedelta
 from sqlalchemy import func
-import models 
 
 load_dotenv()
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+# --- LOGIKA TRENDÓW  ---
 def wylicz_trend(db, book_id: int) -> str:
     tydzien_temu = datetime.utcnow() - timedelta(days=7)
-    
-    # Pełne zapytanie - sprawdza powiązania i bierze pod uwagę tylko ostatnie 7 dni
     sprzedaz_tygodniowa = db.query(func.sum(models.KsiazkaZamowienie.ilosc))\
         .join(models.Zamowienie)\
         .filter(models.KsiazkaZamowienie.ksiazka_id == book_id)\
         .filter(models.Zamowienie.data_zamowienia >= tydzien_temu)\
         .scalar() or 0
     
-    print(f"[DEBUG] Książka {book_id}, sprzedaż z 7 dni: {sprzedaz_tygodniowa}")
-    
-    if sprzedaz_tygodniowa >= 10:
-        return "up"     
-    elif sprzedaz_tygodniowa == 0:
-        return "down"   
+    if sprzedaz_tygodniowa >= 10: return "up"     
+    elif sprzedaz_tygodniowa == 0: return "down"   
     return "stable"
 
-def callback(ch, method, properties, body):
+# --- CALLBACK DLA TRENDÓW ---
+def callback_trendy(ch, method, properties, body):
     dane = json.loads(body)
     book_id = dane.get("book_id")
-    
     db = SessionLocal()
     try:
         ksiazka = db.query(models.Ksiazka).filter(models.Ksiazka.id == book_id).first()
         if ksiazka:
-            nowy_trend = wylicz_trend(db, book_id) 
-            ksiazka.trend = nowy_trend
-            trend_record = db.query(models.Trend).filter(
-                models.Trend.ksiazka_id == book_id
-            ).first()
-
-            sprzedaz = db.query(
-                func.sum(models.KsiazkaZamowienie.ilosc)
-            ).join(models.Zamowienie).filter(
-                models.KsiazkaZamowienie.ksiazka_id == book_id
-            ).scalar() or 0
+            ksiazka.trend = wylicz_trend(db, book_id)
+            trend_record = db.query(models.Trend).filter(models.Trend.ksiazka_id == book_id).first()
+            sprzedaz = db.query(func.sum(models.KsiazkaZamowienie.ilosc)).join(models.Zamowienie).filter(models.KsiazkaZamowienie.ksiazka_id == book_id).scalar() or 0
 
             if trend_record:
                 trend_record.ocena = float(sprzedaz)
                 trend_record.data_aktualizacji = datetime.utcnow()
             else:
-                trend_record = models.Trend(
-                    ksiazka_id=book_id,
-                    ocena=float(sprzedaz),
-                    data_aktualizacji=datetime.utcnow()
-                )
-                db.add(trend_record)
-
-            db.commit()
-            print(f"[+] Zaktualizowano trend dla '{ksiazka.tytul}' na '{nowy_trend}' na podstawie sprzedaży z 7 dni")
-        else:
-            print(f"[-] Nie znaleziono książki o ID: {book_id} w bazie.")
-    except Exception as e:
-        print(f"[!] Błąd bazy danych: {e}")
-        db.rollback()  
-    finally:
-        db.close()   
+                db.add(models.Trend(ksiazka_id=book_id, ocena=float(sprzedaz), data_aktualizacji=datetime.utcnow()))
             
+            db.commit()
+            print(f"[+] Zaktualizowano trend dla ID {book_id}")
+    except Exception as e:
+        print(f"[!] Błąd trendy: {e}")
+        db.rollback()
+    finally:
+        db.close()
     ch.basic_ack(delivery_tag=method.delivery_tag)
 
+# --- CALLBACK DLA PŁATNOŚCI ---
+def callback_platnosci(ch, method, properties, body):
+    try:
+        dane = json.loads(body)
+        zamowienie_id = dane.get("zamowienie_id")
+        
+        print(f"[!] Przetwarzanie płatności dla zamówienia ID: {zamowienie_id}")
+        
+        db = SessionLocal()
+        
+        zamowienie = db.query(models.Zamowienie).filter(models.Zamowienie.id == zamowienie_id).first()
+        
+        if zamowienie:
+            zamowienie.status = "opłacone"
+            db.commit()
+            print(f"[+] Zamówienie {zamowienie_id} zostało oznaczone jako opłacone.")
+        else:
+            print(f"[-] Nie znaleziono zamówienia o ID: {zamowienie_id}")
+            
+    except Exception as e:
+        print(f"[!] Błąd podczas przetwarzania płatności: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
+    ch.basic_ack(delivery_tag=method.delivery_tag)
+
+
+# --- MAIN ---
 def main():
     url = os.getenv("RABBITMQ_URL")
-    if not url:
-        print("[!] Brak zmiennej środowiskowej RABBITMQ_URL w pliku .env!")
-        return
-
     params = pika.URLParameters(url)
     connection = pika.BlockingConnection(params)
     channel = connection.channel()
 
+    # Deklaracja obu kolejek
     channel.queue_declare(queue='trendy_kolejka')
+    channel.queue_declare(queue='platnosci')
 
-    channel.basic_consume(queue='trendy_kolejka', on_message_callback=callback)
+    # Podpięcie konsumentów
+    channel.basic_consume(queue='trendy_kolejka', on_message_callback=callback_trendy)
+    channel.basic_consume(queue='platnosci', on_message_callback=callback_platnosci)
 
-    print(' [*] Worker uruchomiony! Czekam na wiadomości w "trendy_kolejka"... Naciśnij CTRL+C aby wyjść.')
-    
+    print(' [*] Worker gotowy. Oczekuje na wiadomości w obu kolejkach...')
     channel.start_consuming()
 
 if __name__ == '__main__':
-    try:
-        main()
-    except KeyboardInterrupt:
-        print('\n[!] Przerwano działanie workera.')
+    main()

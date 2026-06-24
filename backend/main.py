@@ -70,8 +70,7 @@ def dodaj_ksiazke(ksiazka: schemas.KsiazkaCreate, db: Session = Depends(get_db))
 def get_books(db: Session = Depends(get_db)):
     return book_service.pobierz_ksiazki(db)
 
-
-@app.put("/ksiazki/{book_id}")
+@app.put("/ksiazki/", response_model=schemas.KsiazkaResponse, tags=["Książki"])
 def edytuj_ksiazke(
     book_id: int,
     book_update: schemas.KsiazkaCreate,
@@ -205,7 +204,6 @@ async def github_login():
 
 @app.get("/auth/callback", tags=["Autoryzacja"])
 async def github_callback(code: str, db: Session = Depends(get_db)): 
-    # A. Wymieniamy kod na Access Token od GitHuba
     async with httpx.AsyncClient() as client:
         token_response = await client.post(
             "https://github.com/login/oauth/access_token",

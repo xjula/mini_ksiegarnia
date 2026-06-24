@@ -66,7 +66,7 @@ class PozycjaZamowieniaCreate(BaseModel):
     ilosc: int
 
 class PozycjaZamowieniaResponse(BaseModel):
-    ksiazka_id: int
+    kksiazka_id: Optional[int] = None
     ilosc: int
     cena: float
     class Config:

@@ -4,8 +4,20 @@ services:
     image: rabbitmq:3-management
     container_name: mini_ksiegarnia_rabbitmq
     ports:
-      - "5672:5672"      # Port, przez który Python (Celery) gada z kolejką
-      - "15672:15672"    # Port do panelu w przeglądarce
+      - "5672:5672"      
+      - "15672:15672"    
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
+
+worker:
+  build:
+    context: .
+    dockerfile: backend/Dockerfile  
+    container_name: mini_ksiegarnia_worker
+    restart: always
+    environment:
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq_broker:5672/
+    depends_on:
+      - rabbitmq_broker
+    command: ["python", "backend/worker.py"]

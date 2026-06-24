@@ -123,13 +123,6 @@ export function BooksProvider({ children }: { children: ReactNode }) {
     await fetchReviews();
     await fetchBooks();
 
-    const savedReview: Review = {
-      ...review,
-      id: response.data.id,
-      createdAt: response.data.data_dodania
-    };
-
-    setReviews((prev) => [...prev, savedReview]);
   };
 
   return (
@@ -144,7 +137,8 @@ export function BooksProvider({ children }: { children: ReactNode }) {
         addBook,
         updateBook,
         deleteBook,
-        addReview
+        addReview,
+        fetchReviews
       }}
     >
       {children}

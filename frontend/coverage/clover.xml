@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<coverage generated="1782333246809" clover="3.2.0">
-  <project timestamp="1782333246809" name="All files">
+<coverage generated="1782342163649" clover="3.2.0">
+  <project timestamp="1782342163649" name="All files">
     <metrics statements="157" coveredstatements="83" conditionals="129" coveredconditionals="55" methods="43" coveredmethods="17" elements="329" coveredelements="155" complexity="0" loc="157" ncloc="157" packages="2" files="5" classes="5"/>
     <package name="components">
       <metrics statements="6" coveredstatements="6" conditionals="7" coveredconditionals="7" methods="1" coveredmethods="1"/>
-      <file name="ProtectedRoute.tsx" path="C:\Users\natal\Desktop\sem6\isi_zaf\mini_ksiegarnia\frontend\src\app\components\ProtectedRoute.tsx">
+      <file name="ProtectedRoute.tsx" path="C:\Users\Julia\Nowy folder\mini_ksiegarnia\frontend\src\app\components\ProtectedRoute.tsx">
         <metrics statements="6" coveredstatements="6" conditionals="7" coveredconditionals="7" methods="1" coveredmethods="1"/>
         <line num="13" count="3" type="stmt"/>
         <line num="15" count="3" type="cond" truecount="2" falsecount="0"/>
@@ -16,7 +16,7 @@
     </package>
     <package name="pages">
       <metrics statements="151" coveredstatements="77" conditionals="122" coveredconditionals="48" methods="42" coveredmethods="16"/>
-      <file name="Cart.tsx" path="C:\Users\natal\Desktop\sem6\isi_zaf\mini_ksiegarnia\frontend\src\app\pages\Cart.tsx">
+      <file name="Cart.tsx" path="C:\Users\Julia\Nowy folder\mini_ksiegarnia\frontend\src\app\pages\Cart.tsx">
         <metrics statements="33" coveredstatements="14" conditionals="20" coveredconditionals="3" methods="12" coveredmethods="1"/>
         <line num="9" count="1" type="stmt"/>
         <line num="10" count="1" type="stmt"/>
@@ -52,7 +52,7 @@
         <line num="128" count="0" type="stmt"/>
         <line num="180" count="0" type="stmt"/>
       </file>
-      <file name="Checkout.tsx" path="C:\Users\natal\Desktop\sem6\isi_zaf\mini_ksiegarnia\frontend\src\app\pages\Checkout.tsx">
+      <file name="Checkout.tsx" path="C:\Users\Julia\Nowy folder\mini_ksiegarnia\frontend\src\app\pages\Checkout.tsx">
         <metrics statements="76" coveredstatements="37" conditionals="56" coveredconditionals="22" methods="17" coveredmethods="8"/>
         <line num="19" count="1" type="stmt"/>
         <line num="20" count="1" type="stmt"/>
@@ -131,7 +131,7 @@
         <line num="444" count="0" type="stmt"/>
         <line num="468" count="1" type="stmt"/>
       </file>
-      <file name="Home.tsx" path="C:\Users\natal\Desktop\sem6\isi_zaf\mini_ksiegarnia\frontend\src\app\pages\Home.tsx">
+      <file name="Home.tsx" path="C:\Users\Julia\Nowy folder\mini_ksiegarnia\frontend\src\app\pages\Home.tsx">
         <metrics statements="17" coveredstatements="16" conditionals="18" coveredconditionals="14" methods="7" coveredmethods="6"/>
         <line num="7" count="5" type="stmt"/>
         <line num="8" count="5" type="stmt"/>
@@ -151,7 +151,7 @@
         <line num="52" count="0" type="stmt"/>
         <line num="74" count="7" type="stmt"/>
       </file>
-      <file name="Login.tsx" path="C:\Users\natal\Desktop\sem6\isi_zaf\mini_ksiegarnia\frontend\src\app\pages\Login.tsx">
+      <file name="Login.tsx" path="C:\Users\Julia\Nowy folder\mini_ksiegarnia\frontend\src\app\pages\Login.tsx">
         <metrics statements="25" coveredstatements="10" conditionals="28" coveredconditionals="9" methods="6" coveredmethods="1"/>
         <line num="15" count="3" type="stmt"/>
         <line num="16" count="3" type="stmt"/>
